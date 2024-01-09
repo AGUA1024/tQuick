@@ -11,13 +11,34 @@ import (
 )
 
 type IController interface {
-	PushRegisterList()
+	GetRouteInfo() *api
 }
 
 type Controller struct {
 }
 
-func (this Controller) PushRegisterList() {
+type api struct{
+	method string
+	reqPath string
+	group  string
+	desc string
+}
+
+func (this Controller) GetRouteInfo() *api{
+	st := reflect.TypeOf(this)
+	field := st.Field(0)
+
+	method := strings.ToUpper(field.Tag.Get("method"))
+	reqPath := field.Tag.Get("route")
+	group := field.Tag.Get("group")
+	desc := field.Tag.Get("desc")
+
+	return &api{
+		method:  method,
+		reqPath: reqPath,
+		group:   group ,
+		desc:    desc  ,
+	}
 }
 
 func RouteRegister(ctrl IController) {

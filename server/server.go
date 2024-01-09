@@ -1,6 +1,9 @@
 package server
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/fvbock/endless"
+	"github.com/gin-gonic/gin"
+)
 
 type Server struct {
 	g *gin.Engine
@@ -18,6 +21,6 @@ func Handle(httpMethod, relativePath string, handlers ...gin.HandlerFunc) {
 	}
 }
 
-func Run(addr ...string) (err error) {
-	return Serv.g.Run(addr...)
+func Run(addr string) (err error) {
+	return endless.ListenAndServe(addr, Serv.g)
 }
