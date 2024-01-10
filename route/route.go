@@ -3,71 +3,61 @@ package route
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"reflect"
 	"strings"
 	"tQuick/server"
+
+	"github.com/gin-gonic/gin"
 )
 
 type IController interface {
-	GetRouteInfo() *api
+	GetRouteTag() bool
 }
 
 type Controller struct {
 }
 
-type api struct{
-	method string
-	reqPath string
-	group  string
-	desc string
+type api struct {
+	method     string
+	reqPath    string
+	group      string
+	act        string
+	reqType    reflect.Type
+	rspType    reflect.Type
+	handleFunc reflect.Value
 }
 
-func (this Controller) GetRouteInfo() *api{
-	st := reflect.TypeOf(this)
-	field := st.Field(0)
-
-	method := strings.ToUpper(field.Tag.Get("method"))
-	reqPath := field.Tag.Get("route")
-	group := field.Tag.Get("group")
-	desc := field.Tag.Get("desc")
-
-	return &api{
-		method:  method,
-		reqPath: reqPath,
-		group:   group ,
-		desc:    desc  ,
-	}
+func (this Controller) GetRouteTag() bool {
+	// todo
+	return true
 }
 
 func RouteRegister(ctrl IController) {
 	st := reflect.TypeOf(ctrl)
-	field := st.Field(0)
-
-	method := strings.ToUpper(field.Tag.Get("method"))
-	reqPath := field.Tag.Get("route")
 
 	if st.NumMethod() != 2 {
 		panic("The controller binds too many methods, but only one method is allowed to be bound")
 	}
 
-	fn := st.Method(1)
+	field := st.Field(0)
+	if field.Tag.Get("route") == "" {
+		panic("Controller is missing routing configuration")
+	}
 
-	fn.Func.Call([]reflect.Value{
-		reflect.ValueOf(ctrl),
-	})
-
-	fmt.Println("params:", st.Method(0).Type.In(1), st.Method(0).Type.In(2))
-	// 调用pushRegisterList方法
-	fmt.Println(field.Type.Method(0).Name)
-	//method.Call(nil)
-
-	fmt.Println("method:", method, reqPath)
+	routeInfo := &api{
+		method:     strings.ToUpper(field.Tag.Get("method")),
+		reqPath:    field.Tag.Get("route"),
+		group:      field.Tag.Get("group"),
+		act:        field.Tag.Get("act"),
+		reqType:    st.Method(0).Type.In(1),
+		rspType:    st.Method(0).Type.In(2),
+		handleFunc: st.Method(0).Func,
+	}
 
 	handelFunc := func(c *gin.Context) {
 		reqBodyJson, _ := c.GetRawData()
-		reqBodyType := st.Method(0).Type.In(2)
+		reqBodyType := routeInfo.reqType
 		param := reflect.New(reqBodyType.Elem()).Interface()
 
 		//fmt.Println("params:", param.Type())
@@ -79,23 +69,23 @@ func RouteRegister(ctrl IController) {
 		}
 
 		indirectParam := reflect.Indirect(reflect.ValueOf(param))
-		if isJsonParamMiss(indirectParam) {
+		if isJsonParamMissed(indirectParam) {
 			c.String(http.StatusBadRequest, "Invalid Json Request")
 			return
 		}
 
-		st.Method(0).Func.Call([]reflect.Value{
+		routeInfo.handleFunc.Call([]reflect.Value{
 			reflect.ValueOf(ctrl),
 			reflect.ValueOf(c),
 			reflect.ValueOf(param),
 		})
 	}
 
-	switch method {
+	switch routeInfo.method {
 	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodTrace,
 		http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodConnect, "ANY":
 
-		server.Handle(method, reqPath, handelFunc)
+		server.Handle(routeInfo.method, routeInfo.reqPath, handelFunc)
 
 	default:
 		fmt.Errorf("error method")
@@ -103,7 +93,7 @@ func RouteRegister(ctrl IController) {
 }
 
 // 判断request json对象必选参数是否缺失
-func isJsonParamMiss(jsonInstance reflect.Value) bool {
+func isJsonParamMissed(jsonInstance reflect.Value) bool {
 	for i := 0; i < jsonInstance.NumField(); i++ {
 		fieldValue := jsonInstance.Field(i)
 		// 如果是可选项则跳过判断
@@ -113,7 +103,7 @@ func isJsonParamMiss(jsonInstance reflect.Value) bool {
 
 		// 结构体类型递归判断
 		if fieldValue.Type().Kind() == reflect.Struct {
-			if isJsonParamMiss(fieldValue) {
+			if isJsonParamMissed(fieldValue) {
 				return true
 			}
 		}

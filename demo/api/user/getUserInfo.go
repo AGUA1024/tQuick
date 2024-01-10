@@ -1,8 +1,9 @@
 package user
 
 import (
-	"github.com/gin-gonic/gin"
 	"tQuick/route"
+
+	"github.com/gin-gonic/gin"
 )
 
 func init() {
@@ -10,7 +11,7 @@ func init() {
 }
 
 type GetUserInfo struct {
-	route.Controller `route:"/v1/GetUserInfo" method:"post" group:"验证码" desc:"获取验证码"`
+	route.Controller `route:"/v1/GetUserInfo" method:"post" group:"验证码" act:"获取验证码"`
 }
 
 type require struct {
