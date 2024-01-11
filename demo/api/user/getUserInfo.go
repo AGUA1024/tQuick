@@ -1,17 +1,18 @@
 package user
 
 import (
-	"tQuick/route"
+
 
 	"github.com/gin-gonic/gin"
+	"tQuick/tServer"
 )
 
 func init() {
-	route.RouteRegister(GetUserInfo{})
+	tServer.RouteRegister(GetUserInfo{})
 }
 
 type GetUserInfo struct {
-	route.Controller `route:"/v1/GetUserInfo" method:"post" group:"验证码" act:"获取验证码"`
+	tServer.Controller `route:"/v1/GetUserInfo" method:"get" group:"验证码" act:"获取验证码"`
 }
 
 type require struct {
@@ -23,7 +24,7 @@ type respones struct {
 	Name string `json:"name" desc:"用户名"`
 }
 
-func (this GetUserInfo) GetName(ctx *gin.Context, req *require) *respones {
+func (g GetUserInfo) GetName(ctx *gin.Context, req *require) *respones {
 	if req.Account == 1 {
 		return &respones{
 			Name: "tQuickName1",

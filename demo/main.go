@@ -1,8 +1,11 @@
 package main
 
-import "tQuick/server"
+import (
+	"tQuick/tServer"
+)
+
 import _ "main/api/user"
 
 func main() {
-	server.Run(":8080")
+	tServer.Run(":8080")
 }
