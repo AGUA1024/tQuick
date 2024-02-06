@@ -65,7 +65,7 @@ func (s *Server)ApiRegister(api *Api){
 func Run(addr string) error {
 	server := GetServer()
 
-	DocInit(server.Api)
+	DocInit(server)
 
 	return endless.ListenAndServe(addr, server.g)
 }

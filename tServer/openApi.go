@@ -2,7 +2,6 @@ package tServer
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"tQuick/tServer/openApi"
 )
@@ -76,8 +75,9 @@ type IApi interface {
 }
 
 // Add adds an instance of struct or a route function to OpenApiV3 definition implements.
-func DocInit(apiSet map[string]*ApiSet) string {
-	c := gin.Default()
+func DocInit(s *Server) {
+	apiSet := s.Api
+	c := s.g
 
 	//reqBodyType := api.RspType
 	//fmt.Println("pkgPath:", reqBodyType.Elem().Name(), reqBodyType.Elem().PkgPath())
@@ -154,12 +154,9 @@ func DocInit(apiSet map[string]*ApiSet) string {
 	json, _ := json.Marshal(oai)
 	openApiV3Str := string(json)
 
-	fmt.Println(openApiV3Str)
 	c.GET("/data/knife4j.json", func(c *gin.Context) {
 		c.String(200, openApiV3Str)
 	})
-	c.Run(":8999")
-	return openApiV3Str
 }
 
 

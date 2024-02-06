@@ -1,8 +1,6 @@
 package user
 
 import (
-
-
 	"github.com/gin-gonic/gin"
 	"tQuick/tServer"
 )
@@ -12,16 +10,16 @@ func init() {
 }
 
 type GetUserInfo struct {
-	tServer.Controller `route:"/v1/GetUserInfo" method:"get" group:"验证码" act:"获取验证码"`
+	tServer.Controller `route:"/v1/GetUserInfo" method:"post" group:"验证码" act:"获取验证码"`
 }
 
 type require struct {
-	Account int    `json:"id" desc:"用户账号"`
-	Pass    string `json:"pass,omitempty" desc:"用户密码"`
+	Account int    `desc:"用户账号"`
+	Pass    string `desc:"用户密码"`
 }
 
 type respones struct {
-	Name string `json:"name" desc:"用户名"`
+	Name string `desc:"用户名"`
 }
 
 func (g GetUserInfo) GetName(ctx *gin.Context, req *require) *respones {

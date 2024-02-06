@@ -75,6 +75,10 @@ func RouteRegister(ctrl IController) {
 		panic("Controller is missing routing configuration")
 	}
 
+	if field.Tag.Get("method") == "" {
+		panic("Controller is missing the configuration of the http method")
+	}
+
 	// 构造api实例对象
 	api := &Api{
 		Method:     strings.ToUpper(field.Tag.Get("method")),
@@ -92,28 +96,33 @@ func RouteRegister(ctrl IController) {
 	// 构造handle函数
 	handelFunc := func(c *gin.Context) {
 		reqBodyJson, _ := c.GetRawData()
-		reqBodyType := api.RspType
+		js,_ :=json.Marshal(c.Request)
+		fmt.Println(string(js))
+		reqBodyType := api.ReqType
 		param := reflect.New(reqBodyType.Elem()).Interface()
-		fmt.Println("pkgPath:", reqBodyType.PkgPath())
-		//fmt.Println("params:", param.Type())
+
+		//fmt.Println("params:", reflect.New(reqBodyType.Elem()).Type())
 		// 解析JSON数据到参数实例
 		err := json.Unmarshal(reqBodyJson, param)
 		if err != nil {
-			c.String(http.StatusBadRequest, "Invalid Json Request")
+			c.String(http.StatusBadRequest, "Invalid Json Request:", err)
 			return
 		}
 
 		indirectParam := reflect.Indirect(reflect.ValueOf(param))
 		if isJsonParamMissed(indirectParam) {
-			c.String(http.StatusBadRequest, "Invalid Json Request")
+			c.String(http.StatusBadRequest, "Invalid Json Request: ParamMissed")
 			return
 		}
-
-		api.HandleFunc.Call([]reflect.Value{
+		retValue := api.HandleFunc.Call([]reflect.Value{
 			reflect.ValueOf(ctrl),
 			reflect.ValueOf(c),
 			reflect.ValueOf(param),
 		})
+
+		if !c.Writer.Written(){
+			c.JSON(200, retValue[0].Interface())
+		}
 	}
 
 	// 注册handel函数
@@ -136,6 +145,7 @@ func RouteRegister(ctrl IController) {
 func isJsonParamMissed(jsonInstance reflect.Value) bool {
 	for i := 0; i < jsonInstance.NumField(); i++ {
 		fieldValue := jsonInstance.Field(i)
+
 		// 如果是可选项则跳过判断
 		if strings.Contains(jsonInstance.Type().Field(i).Tag.Get("json"), "omitempty") {
 			continue
