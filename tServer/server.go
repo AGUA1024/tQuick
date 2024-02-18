@@ -8,28 +8,28 @@ import (
 )
 
 type Server struct {
-	g *gin.Engine
+	g   *gin.Engine
 	Api map[string]*ApiSet
 }
 
 var Serv = &Server{
-	g: gin.Default(),
-	Api : map[string]*ApiSet{},
+	g:   gin.Default(),
+	Api: map[string]*ApiSet{},
 }
 
-func GetServer() *Server{
+func GetServer() *Server {
 	return Serv
 }
 
 // s.Api map[string]*Api  path => api
-func (s *Server)ApiRegister(api *Api){
-	_,isSet := s.Api[api.ReqPath]
-	if !isSet{
+func (s *Server) ApiRegister(api *Api) {
+	_, isSet := s.Api[api.ReqPath]
+	if !isSet {
 		s.Api[api.ReqPath] = &ApiSet{}
 	}
 
-	f := func(a *Api) *Api{
-		if isSet && a != nil{
+	f := func(a *Api) *Api {
+		if isSet && a != nil {
 			panic(fmt.Sprintf("The api is repeatedly defined. [%s]:%s", api.Method, api.ReqPath))
 		}
 
@@ -69,4 +69,3 @@ func Run(addr string) error {
 
 	return endless.ListenAndServe(addr, server.g)
 }
-

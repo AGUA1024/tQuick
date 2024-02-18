@@ -1,7 +1,6 @@
 package tServer
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -28,18 +27,17 @@ type Api struct {
 }
 
 type ApiSet struct {
-	Get  *Api
-	Post  *Api
-	Put  *Api
-	Patch  *Api
-	Trace  *Api
-	Head  *Api
-	Options  *Api
+	Get     *Api
+	Post    *Api
+	Put     *Api
+	Patch   *Api
+	Trace   *Api
+	Head    *Api
+	Options *Api
 	Delete  *Api
-	Connect  *Api
-	Any *Api
+	Connect *Api
+	Any     *Api
 }
-
 
 func (a Api) GetMethod() string {
 	return a.Method
@@ -95,23 +93,21 @@ func RouteRegister(ctrl IController) {
 
 	// 构造handle函数
 	handelFunc := func(c *gin.Context) {
-		reqBodyJson, _ := c.GetRawData()
-		js,_ :=json.Marshal(c.Request)
-		fmt.Println(string(js))
-		reqBodyType := api.ReqType
-		param := reflect.New(reqBodyType.Elem()).Interface()
-
-		//fmt.Println("params:", reflect.New(reqBodyType.Elem()).Type())
-		// 解析JSON数据到参数实例
-		err := json.Unmarshal(reqBodyJson, param)
-		if err != nil {
-			c.String(http.StatusBadRequest, "Invalid Json Request:", err)
+		decodeFunc, ok := st.Method(0).Type.In(2).MethodByName("ReqDecode")
+		if !ok {
+			panic("request obj error!")
 			return
 		}
 
-		indirectParam := reflect.Indirect(reflect.ValueOf(param))
-		if isJsonParamMissed(indirectParam) {
-			c.String(http.StatusBadRequest, "Invalid Json Request: ParamMissed")
+		arrRetValue := decodeFunc.Func.Call(
+			[]reflect.Value{reflect.New(api.ReqType.Elem()), reflect.ValueOf(c), reflect.ValueOf(api.ReqType)},
+		)
+
+		param := arrRetValue[0].Interface()
+		err, ok := arrRetValue[1].Interface().(error)
+
+		if ok && err != nil {
+			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		retValue := api.HandleFunc.Call([]reflect.Value{
@@ -120,7 +116,7 @@ func RouteRegister(ctrl IController) {
 			reflect.ValueOf(param),
 		})
 
-		if !c.Writer.Written(){
+		if !c.Writer.Written() {
 			c.JSON(200, retValue[0].Interface())
 		}
 	}
@@ -145,9 +141,15 @@ func RouteRegister(ctrl IController) {
 func isJsonParamMissed(jsonInstance reflect.Value) bool {
 	for i := 0; i < jsonInstance.NumField(); i++ {
 		fieldValue := jsonInstance.Field(i)
+		fieldType := jsonInstance.Type().Field(i)
+
+		// 跳过匿名对象，即跳过继承类的判断
+		if fieldType.Anonymous {
+			continue
+		}
 
 		// 如果是可选项则跳过判断
-		if strings.Contains(jsonInstance.Type().Field(i).Tag.Get("json"), "omitempty") {
+		if strings.ToLower(fieldType.Tag.Get("required")) == "false" || fieldType.Anonymous {
 			continue
 		}
 
@@ -167,24 +169,50 @@ func isJsonParamMissed(jsonInstance reflect.Value) bool {
 	return false
 }
 
-
-func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet){
+func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 	f := func(schemaRefs map[string]*openApi.SchemaRef, api *Api) {
 		if api == nil {
 			return
 		}
 
-		schemaRefs[api.ReqType.Elem().PkgPath() +"/"+ api.ReqType.Elem().Name()] = &openApi.SchemaRef{
-			Properties: getParmas(api.ReqType),
-			Type:       api.ReqType.Name(),
-			Required:   []string{},
+		typeStack := []reflect.Type{api.ReqType, api.RspType}
+		//instant := api.ReqType.Elem()
+		//for i := 0; i < instant.NumField(); i++ {
+		//	field := instant.Field(i)
+		//	// 跳过匿名字段，目的是跳过继承来的对象
+		//	if field.Anonymous == true {
+		//		continue
+		//	}
+		//
+		//	fmt.Println(field.Name, field.Tag.Get("required"))
+		//}
+
+		for len(typeStack) > 0 {
+			tp := typeStack[0]
+			typeStack = typeStack[1:]
+
+			// 兼容指针类型，若是指针类型则将tp的值设置为指针所指的地址的值
+			if tp.Kind() == reflect.Pointer {
+				tp = tp.Elem()
+			}
+
+			ref, arrTypeNode := getSchemaRef(tp)
+			typeStack = append(typeStack, arrTypeNode...)
+
+			schemaRefs[tp.PkgPath()+"/"+tp.Name()] = ref
 		}
 
-		schemaRefs[api.RspType.Elem().PkgPath() + "/"+api.RspType.Elem().Name()] = &openApi.SchemaRef{
-			Properties: getParmas(api.RspType),
-			Type:       api.RspType.Name(),
-			Required:   []string{},
-		}
+		//schemaRefs[api.ReqType.Elem().PkgPath()+"/"+api.ReqType.Elem().Name()] = &openApi.SchemaRef{
+		//	Properties: getParmas(api.ReqType),
+		//	Type:       api.ReqType.Name(),
+		//	Required:   []string{},
+		//}
+		//
+		//schemaRefs[api.RspType.Elem().PkgPath()+"/"+api.RspType.Elem().Name()] = &openApi.SchemaRef{
+		//	Properties: getParmas(api.RspType),
+		//	Type:       api.RspType.Name(),
+		//	Required:   []string{},
+		//}
 	}
 
 	f(schemas, apiSet.Put)
@@ -201,31 +229,44 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet){
 }
 
 // 判断request json对象必选参数是否缺失
-func getParmas(tp reflect.Type) map[string]any{
-	instant := tp.Elem()
+func getSchemaRef(tp reflect.Type) (*openApi.SchemaRef, []reflect.Type) {
+	properties := map[string]any{}
+	arrRequired := []string{}
+	arrParamType := []reflect.Type{}
 
-	ret := map[string]any{}
+	for i := 0; i < tp.NumField(); i++ {
+		field := tp.Field(i)
 
-	for i := 0; i < instant.NumField(); i++ {
-		field := instant.Field(i)
+		// 跳过匿名字段，目的是跳过继承来的对象
+		if field.Anonymous == true {
+			continue
+		}
+
+		// 必须字段判断
+		if strings.ToLower(field.Tag.Get("required")) != "false" {
+			arrRequired = append(arrRequired, field.Name)
+		}
 
 		// 结构体类型递归判断
 		if field.Type.Kind() == reflect.Struct {
-			ret[field.Name] = openApi.Propertie{
-				Format:      field.Type.Name(),
+			properties[field.Name] = openApi.Propertie{
 				Description: field.Tag.Get("desc"),
-				Properties:  getParmas(field.Type),
-				Type:        field.Type.Name(),
+				Ref:         "#/components/schemas/" + field.Type.PkgPath() + "/" + field.Type.Name(),
 			}
-		}else{	// 常规类型
-			ret[field.Name] = openApi.Propertie{
+
+			arrParamType = append(arrParamType, field.Type)
+		} else { // 常规类型
+			properties[field.Name] = openApi.Propertie{
 				Format:      field.Type.Name(),
 				Description: field.Tag.Get("desc"),
-				Properties:  nil,
 				Type:        field.Type.Name(),
 			}
 		}
 	}
 
-	return ret
+	return &openApi.SchemaRef{
+		Properties: properties,
+		Type:       tp.Name(),
+		Required:   arrRequired,
+	}, arrParamType
 }

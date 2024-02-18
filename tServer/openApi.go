@@ -11,7 +11,7 @@ import (
 // https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.0.md
 type OpenApiV3 struct {
 	Config       openApi.Config                `json:"-"`
-	OpenAPI      string                `json:"openapi"`
+	OpenAPI      string                        `json:"openapi"`
 	Components   openApi.Components            `json:"components,omitempty"`
 	Info         openApi.Info                  `json:"info"`
 	Paths        openApi.Paths                 `json:"paths"`
@@ -43,9 +43,8 @@ const (
 	ParameterInHeader = `header`
 	ParameterInPath   = `path`
 	ParameterInQuery  = `query`
-	ParameterInBody = `body`
+	ParameterInBody   = `body`
 )
-
 
 // AddInput is the structured parameter for function OpenApiV3.Add.
 type AddInput struct {
@@ -79,9 +78,6 @@ func DocInit(s *Server) {
 	apiSet := s.Api
 	c := s.g
 
-	//reqBodyType := api.RspType
-	//fmt.Println("pkgPath:", reqBodyType.Elem().Name(), reqBodyType.Elem().PkgPath())
-
 	c.GET("/knife4j/openapi.json", func(c *gin.Context) {
 		c.String(200, `[
 			{
@@ -101,7 +97,7 @@ func DocInit(s *Server) {
 	routPaths := map[string]openApi.Path{}
 	components := map[string]*openApi.SchemaRef{}
 
-	for reqPath,v := range apiSet{
+	for reqPath, v := range apiSet {
 		getComponents(components, v)
 
 		routPaths[reqPath] = openApi.Path{
@@ -126,7 +122,7 @@ func DocInit(s *Server) {
 		Config:  openApi.Config{},
 		OpenAPI: "3.0.0",
 		Components: openApi.Components{
-			Schemas:	components,
+			Schemas:         components,
 			Parameters:      nil,
 			Headers:         nil,
 			RequestBodies:   nil,
@@ -144,7 +140,7 @@ func DocInit(s *Server) {
 			License:        nil,
 			Version:        "OpenApiV3.Info.Version",
 		},
-		Paths: routPaths,
+		Paths:        routPaths,
 		Security:     nil,
 		Servers:      nil,
 		Tags:         nil,
@@ -159,41 +155,39 @@ func DocInit(s *Server) {
 	})
 }
 
-
-
-func getOpts(methodApi *Api) *openApi.Operation{
-	if methodApi == nil{
+func getOpts(methodApi *Api) *openApi.Operation {
+	if methodApi == nil {
 		return nil
 	}
 
-	return  &openApi.Operation{
-		Tags:         []string{methodApi.GetGroup()},
-		Summary:      methodApi.GetAct(),
-		Description:  "Get.Description",
-		OperationID:  "",
-		Parameters:   []openApi.Parameter{
+	return &openApi.Operation{
+		Tags:        []string{methodApi.GetGroup()},
+		Summary:     methodApi.GetAct(),
+		Description: "Get.Description",
+		OperationID: "",
+		Parameters: []openApi.Parameter{
 			{
-				Name: methodApi.ReqType.Elem().Name(),
-				In: "body",
+				Name:        methodApi.ReqType.Elem().Name(),
+				In:          "body",
 				Description: "Parameter.Description",
 				Schema: &openApi.SchemaRef{
-					Ref: "#/components/schemas/" + methodApi.ReqType.Elem().PkgPath() +"/" + methodApi.ReqType.Elem().Name(),
+					Ref: "#/components/schemas/" + methodApi.ReqType.Elem().PkgPath() + "/" + methodApi.ReqType.Elem().Name(),
 				},
 			},
 		},
-		RequestBody:  nil,
-		Responses:    map[string]*openApi.Response{
-			"200" : {
+		RequestBody: nil,
+		Responses: map[string]*openApi.Response{
+			"200": {
 				Description: "",
 				Headers:     nil,
 				Content: map[string]openApi.MediaType{
-					"text/xml" :{
+					"text/xml": {
 						Schema: &openApi.SchemaRef{
-							Ref: "#/components/schemas/" + methodApi.RspType.Elem().PkgPath()+"/" + methodApi.RspType.Elem().Name(),
+							Ref: "#/components/schemas/" + methodApi.RspType.Elem().PkgPath() + "/" + methodApi.RspType.Elem().Name(),
 						},
 					},
 				},
-				Links:       nil,
+				Links: nil,
 			},
 		},
 		Deprecated:   false,

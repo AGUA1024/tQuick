@@ -14,12 +14,19 @@ type GetUserInfo struct {
 }
 
 type require struct {
-	Account int    `desc:"用户账号"`
-	Pass    string `desc:"用户密码"`
+	tServer.HttpJsonBody
+	Account int     `desc:"用户账号"`
+	Pass    string  `desc:"用户密码" required:"False"`
+	Obj     ObjType `desc:"require Obj的注释"`
+}
+
+type ObjType struct {
+	Count int `desc:"数量"`
 }
 
 type respones struct {
-	Name string `desc:"用户名"`
+	Name string  `desc:"用户名"`
+	Obj  ObjType `desc:"respones Obj的注释"`
 }
 
 func (g GetUserInfo) GetName(ctx *gin.Context, req *require) *respones {
