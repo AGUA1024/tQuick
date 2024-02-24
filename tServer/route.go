@@ -21,7 +21,7 @@ type Api struct {
 	ReqPath    string
 	Group      string
 	Act        string
-	ReqType    reflect.Type
+	arrReqType []reflect.Type
 	RspType    reflect.Type
 	HandleFunc reflect.Value
 }
@@ -77,13 +77,21 @@ func RouteRegister(ctrl IController) {
 		panic("Controller is missing the configuration of the http method")
 	}
 
+	arrReqType := []reflect.Type{}
+	for i := 1; i < st.Method(0).Type.NumIn(); i++ {
+		if st.Method(0).Type.In(i) == reflect.TypeOf(&gin.Context{}) {
+			continue
+		}
+		arrReqType = append(arrReqType, st.Method(0).Type.In(i))
+	}
+
 	// 构造api实例对象
 	api := &Api{
 		Method:     strings.ToUpper(field.Tag.Get("method")),
 		ReqPath:    field.Tag.Get("route"),
 		Group:      field.Tag.Get("group"),
 		Act:        field.Tag.Get("act"),
-		ReqType:    st.Method(0).Type.In(2),
+		arrReqType: arrReqType,
 		RspType:    st.Method(0).Type.Out(0),
 		HandleFunc: st.Method(0).Func,
 	}
@@ -93,28 +101,38 @@ func RouteRegister(ctrl IController) {
 
 	// 构造handle函数
 	handelFunc := func(c *gin.Context) {
-		decodeFunc, ok := st.Method(0).Type.In(2).MethodByName("ReqDecode")
-		if !ok {
-			panic("request obj error!")
-			return
-		}
-
-		arrRetValue := decodeFunc.Func.Call(
-			[]reflect.Value{reflect.New(api.ReqType.Elem()), reflect.ValueOf(c), reflect.ValueOf(api.ReqType)},
-		)
-
-		param := arrRetValue[0].Interface()
-		err, ok := arrRetValue[1].Interface().(error)
-
-		if ok && err != nil {
-			c.JSON(http.StatusBadRequest, err.Error())
-			return
-		}
-		retValue := api.HandleFunc.Call([]reflect.Value{
+		handleFuncParma := []reflect.Value{
 			reflect.ValueOf(ctrl),
 			reflect.ValueOf(c),
-			reflect.ValueOf(param),
-		})
+		}
+
+		for _, reqType := range arrReqType {
+			if reqType.Kind() != reflect.Pointer {
+				reqType = reflect.PtrTo(reqType)
+			}
+
+			decodeFunc, ok := reqType.MethodByName("ReqDecode")
+			if !ok {
+				panic("request obj error!")
+				return
+			}
+
+			arrRetValue := decodeFunc.Func.Call(
+				[]reflect.Value{reflect.New(reqType.Elem()), reflect.ValueOf(c), reflect.ValueOf(reqType)},
+			)
+
+			param := arrRetValue[0].Interface()
+			err, ok := arrRetValue[1].Interface().(error)
+
+			if ok && err != nil {
+				c.JSON(http.StatusBadRequest, err.Error())
+				return
+			}
+
+			handleFuncParma = append(handleFuncParma, reflect.ValueOf(param))
+		}
+
+		retValue := api.HandleFunc.Call(handleFuncParma)
 
 		if !c.Writer.Written() {
 			c.JSON(200, retValue[0].Interface())
@@ -138,7 +156,7 @@ func RouteRegister(ctrl IController) {
 }
 
 // 判断request json对象必选参数是否缺失
-func isJsonParamMissed(jsonInstance reflect.Value) bool {
+func isParamMissed(jsonInstance reflect.Value) bool {
 	for i := 0; i < jsonInstance.NumField(); i++ {
 		fieldValue := jsonInstance.Field(i)
 		fieldType := jsonInstance.Type().Field(i)
@@ -155,7 +173,7 @@ func isJsonParamMissed(jsonInstance reflect.Value) bool {
 
 		// 结构体类型递归判断
 		if fieldValue.Type().Kind() == reflect.Struct {
-			if isJsonParamMissed(fieldValue) {
+			if isParamMissed(fieldValue) {
 				return true
 			}
 		}
@@ -175,7 +193,7 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 			return
 		}
 
-		typeStack := []reflect.Type{api.ReqType, api.RspType}
+		typeStack := append(api.arrReqType, api.RspType)
 		//instant := api.ReqType.Elem()
 		//for i := 0; i < instant.NumField(); i++ {
 		//	field := instant.Field(i)

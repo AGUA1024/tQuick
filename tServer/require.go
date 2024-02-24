@@ -39,15 +39,33 @@ func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, err
 	}
 
 	indirectParam := reflect.Indirect(reflect.ValueOf(param))
-	if isJsonParamMissed(indirectParam) {
+	if isParamMissed(indirectParam) {
 		return nil, errors.New("Invalid Json Request: ParamMissed")
 	}
 
 	return param, nil
 }
 
-func (j *HttpHeader) ReqDecode(c *gin.Context) (any, error) {
-	return nil, errors.New("todo")
+func (j *HttpJsonBody) GetHttpParmaType() string {
+	return "body"
+}
+
+func (j *HttpHeader) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	param := reflect.New(reqType.Elem()).Interface()
+	err := c.BindHeader(param)
+	if err != nil {
+		return nil, errors.New("Invalid Http Header:" + err.Error())
+	}
+
+	indirectParam := reflect.Indirect(reflect.ValueOf(param))
+	if isParamMissed(indirectParam) {
+		return nil, errors.New("Invalid Json Request: Http Header Missed")
+	}
+	return param, nil
+}
+
+func (j *HttpHeader) GetHttpParmaType() string {
+	return "header"
 }
 
 func (j *HttpQuery) ReqDecode(c *gin.Context) (any, error) {

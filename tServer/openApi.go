@@ -3,6 +3,7 @@ package tServer
 import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"reflect"
 	"tQuick/tServer/openApi"
 )
 
@@ -160,21 +161,40 @@ func getOpts(methodApi *Api) *openApi.Operation {
 		return nil
 	}
 
+	arrApiParam := []openApi.Parameter{}
+	for _, reqType := range methodApi.arrReqType {
+		// 指针类型兼容
+		if reqType.Kind() == reflect.Pointer {
+			reqType = reqType.Elem()
+		}
+
+		// 方法是指针类型的方法
+		getHttpTypeFunc, ok := reflect.PointerTo(reqType).MethodByName("GetHttpParmaType")
+		if !ok {
+			panic("GetHttpParmaType Error")
+		}
+
+		arrRetValue := getHttpTypeFunc.Func.Call(
+			[]reflect.Value{reflect.New(reqType)},
+		)
+
+		InType := arrRetValue[0].String()
+
+		arrApiParam = append(arrApiParam, openApi.Parameter{
+			Name:        reqType.Name(),
+			In:          InType,
+			Description: "Parameter.Description",
+			Schema: &openApi.SchemaRef{
+				Ref: "#/components/schemas/" + reqType.PkgPath() + "/" + reqType.Name(),
+			},
+		})
+	}
 	return &openApi.Operation{
 		Tags:        []string{methodApi.GetGroup()},
 		Summary:     methodApi.GetAct(),
 		Description: "Get.Description",
 		OperationID: "",
-		Parameters: []openApi.Parameter{
-			{
-				Name:        methodApi.ReqType.Elem().Name(),
-				In:          "body",
-				Description: "Parameter.Description",
-				Schema: &openApi.SchemaRef{
-					Ref: "#/components/schemas/" + methodApi.ReqType.Elem().PkgPath() + "/" + methodApi.ReqType.Elem().Name(),
-				},
-			},
-		},
+		Parameters:  arrApiParam,
 		RequestBody: nil,
 		Responses: map[string]*openApi.Response{
 			"200": {
