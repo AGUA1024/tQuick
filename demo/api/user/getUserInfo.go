@@ -2,8 +2,8 @@ package user
 
 import (
 	"fmt"
+	"github.com/AGUA1024/tQuick/tServer"
 	"github.com/gin-gonic/gin"
-	"tQuick/tServer"
 )
 
 func init() {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"tQuick/tServer"
+	"github.com/AGUA1024/tQuick/tServer"
 )
 
 import _ "main/api/user"

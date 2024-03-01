@@ -2,9 +2,9 @@ package tServer
 
 import (
 	"encoding/json"
+	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/gin-gonic/gin"
 	"reflect"
-	"tQuick/tServer/openApi"
 )
 
 // OpenApiV3 is the structure defined from:

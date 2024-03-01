@@ -2,11 +2,11 @@ package tServer
 
 import (
 	"fmt"
+	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"reflect"
 	"strings"
-	"tQuick/tServer/openApi"
 )
 
 type IController interface {
