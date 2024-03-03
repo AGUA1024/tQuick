@@ -1,11 +1,13 @@
 module main
 
-go 1.20
+go 1.21.0
 
 require (
-	github.com/AGUA1024/tQuick v0.0.0-20240301135413-15242008aea6
+	github.com/AGUA1024/tQuick v0.0.0-20240301152815-1de848c4e1fb
 	github.com/gin-gonic/gin v1.9.1
 )
+
+replace github.com/AGUA1024/tQuick => ../
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect

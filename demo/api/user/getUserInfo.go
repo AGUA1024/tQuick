@@ -11,17 +11,17 @@ func init() {
 }
 
 type GetUserInfo struct {
-	tServer.Controller `route:"/v1/:appId/GetUserInfo/" method:"post" group:"验证码" act:"获取验证码"`
+	tServer.Controller `route:"/v1/:appId/GetUserInfo" method:"post" group:"验证码" act:"获取验证码"`
 }
 
 type reqUri struct {
 	tServer.HttpUri
-	AppId string
+	AppId string `desc:"用户appId"`
 }
 
 type reqHeader struct {
 	tServer.HttpHeader
-	Authorization string
+	Authorization string `desc:"身份验证密钥"`
 }
 
 type require struct {

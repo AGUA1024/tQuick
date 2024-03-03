@@ -5,6 +5,8 @@ import (
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/gin-gonic/gin"
 	"reflect"
+	"regexp"
+	"strings"
 )
 
 // OpenApiV3 is the structure defined from:
@@ -93,7 +95,11 @@ func DocInit(s *Server) {
 	for reqPath, v := range apiSet {
 		getComponents(components, v)
 
-		routPaths[reqPath] = openApi.Path{
+		// 请求路径，文档参数兼容动态路由类型
+		re := regexp.MustCompile(`:(\w+)`)
+		newPath := re.ReplaceAllString(reqPath, "{$1}")
+
+		routPaths[newPath] = openApi.Path{
 			Ref:         "",
 			Summary:     "",
 			Description: "",
@@ -172,15 +178,42 @@ func getOpts(methodApi *Api) *openApi.Operation {
 
 		InType := arrRetValue[0].String()
 
-		arrApiParam = append(arrApiParam, openApi.Parameter{
-			Name:        reqType.Name(),
-			In:          InType,
-			Description: "Parameter.Description",
-			Schema: &openApi.SchemaRef{
-				Ref: "#/components/schemas/" + reqType.PkgPath() + "/" + reqType.Name(),
-			},
-		})
+		for i := 0; i < reqType.NumField(); i++ {
+			parma := reqType.Field(i)
+			required := true
+			// 跳过匿名对象，即跳过继承类的判断
+			if parma.Anonymous {
+				continue
+			}
+
+			// 如果是可选项则跳过判断
+			if strings.ToLower(parma.Tag.Get("required")) == "false" {
+				required = false
+			}
+
+			if parma.Type.Kind() == reflect.Struct {
+				arrApiParam = append(arrApiParam, openApi.Parameter{
+					Name:        parma.Name,
+					In:          InType,
+					Description: "Parameter.Description",
+					Schema: &openApi.SchemaRef{
+						Ref: "#/components/schemas/" + parma.Type.PkgPath() + "/" + parma.Type.Name(),
+					},
+				})
+			} else {
+				arrApiParam = append(arrApiParam, openApi.Parameter{
+					Name:        parma.Name,
+					In:          InType,
+					Description: parma.Tag.Get("desc"),
+					Required:    required,
+					Schema: &openApi.SchemaRef{
+						Type: parma.Type.Name(),
+					},
+				})
+			}
+		}
 	}
+
 	return &openApi.Operation{
 		Tags:        []string{methodApi.GetGroup()},
 		Summary:     methodApi.GetAct(),

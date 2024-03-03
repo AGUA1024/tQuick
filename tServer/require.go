@@ -115,7 +115,7 @@ func (j *HttpUri) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 
 	err := decoder.Decode(param, params)
 	if err != nil {
-		return nil, errors.New("Invalid Http Query:" + err.Error())
+		return nil, errors.New("Invalid Http Uri:" + err.Error())
 	}
 
 	indirectParam := reflect.Indirect(reflect.ValueOf(param))

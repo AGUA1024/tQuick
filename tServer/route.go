@@ -193,17 +193,23 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 			return
 		}
 
-		typeStack := append(api.arrReqType, api.RspType)
-		//instant := api.ReqType.Elem()
-		//for i := 0; i < instant.NumField(); i++ {
-		//	field := instant.Field(i)
-		//	// 跳过匿名字段，目的是跳过继承来的对象
-		//	if field.Anonymous == true {
-		//		continue
-		//	}
-		//
-		//	fmt.Println(field.Name, field.Tag.Get("required"))
-		//}
+		typeStack := []reflect.Type{}
+		for _, v := range api.arrReqType {
+			// 指针类型兼容
+			if v.Kind() == reflect.Pointer {
+				v = v.Elem()
+			}
+
+			for i := 0; i < v.NumField(); i++ {
+				// 跳过匿名字段，目的是跳过继承来的对象
+				if v.Field(i).Anonymous == true {
+					continue
+				}
+				typeStack = append(typeStack, v.Field(i).Type)
+			}
+		}
+
+		typeStack = append(typeStack, api.RspType)
 
 		for len(typeStack) > 0 {
 			tp := typeStack[0]
@@ -214,10 +220,11 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 				tp = tp.Elem()
 			}
 
-			ref, arrTypeNode := getSchemaRef(tp)
-			typeStack = append(typeStack, arrTypeNode...)
-
-			schemaRefs[tp.PkgPath()+"/"+tp.Name()] = ref
+			if tp.Kind() == reflect.Struct {
+				ref, arrTypeNode := getSchemaRef(tp)
+				typeStack = append(typeStack, arrTypeNode...)
+				schemaRefs[tp.PkgPath()+"/"+tp.Name()] = ref
+			}
 		}
 
 		//schemaRefs[api.ReqType.Elem().PkgPath()+"/"+api.ReqType.Elem().Name()] = &openApi.SchemaRef{
