@@ -64,7 +64,11 @@ func RouteRegister(ctrl IController) {
 	st := reflect.TypeOf(ctrl)
 
 	// controller合法性鉴定
-	if st.NumMethod() != 2 {
+	if st.NumMethod() < 1 {
+		panic("The controller must be bound to a method to work properly")
+	}
+
+	if st.NumMethod() > 1 {
 		panic("The controller binds too many methods, but only one Method is allowed to be bound")
 	}
 

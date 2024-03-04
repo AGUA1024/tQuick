@@ -1,6 +1,6 @@
 module github.com/AGUA1024/tQuick
 
-go 1.20
+go 1.21.0
 
 require (
 	github.com/fvbock/endless v0.0.0-20170109170031-447134032cb6
@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/AGUA1024/tQuick/cmd/tq v0.0.0-20240303152914-2cbf825c2877 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
