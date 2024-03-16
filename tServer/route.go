@@ -2,6 +2,7 @@ package tServer
 
 import (
 	"fmt"
+	"github.com/AGUA1024/tQuick/tIRoute"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -9,9 +10,8 @@ import (
 	"strings"
 )
 
-type IController interface {
-	RegisterApi() bool
-}
+// 注册的controller集合
+var ServCtrl = []tIRoute.IController{}
 
 type Controller struct {
 }
@@ -60,102 +60,105 @@ func (this Controller) RegisterApi() bool {
 	return true
 }
 
-func RouteRegister(ctrl IController) {
-	st := reflect.TypeOf(ctrl)
+func RouteRegister(ctrl tIRoute.IController) {
+	ServCtrl = append(ServCtrl, ctrl)
+}
 
-	// controller合法性鉴定
-	if st.NumMethod() < 1 {
-		panic("The controller must be bound to a method to work properly")
-	}
+func (s Server) RouteRegister(ctrlSet []tIRoute.IController) {
+	for _, ctrl := range ctrlSet {
+		st := reflect.TypeOf(ctrl)
 
-	if st.NumMethod() > 1 {
-		panic("The controller binds too many methods, but only one Method is allowed to be bound")
-	}
-
-	field := st.Field(0)
-	if field.Tag.Get("route") == "" {
-		panic("Controller is missing routing configuration")
-	}
-
-	if field.Tag.Get("method") == "" {
-		panic("Controller is missing the configuration of the http method")
-	}
-
-	arrReqType := []reflect.Type{}
-	for i := 1; i < st.Method(0).Type.NumIn(); i++ {
-		if st.Method(0).Type.In(i) == reflect.TypeOf(&gin.Context{}) {
-			continue
-		}
-		arrReqType = append(arrReqType, st.Method(0).Type.In(i))
-	}
-
-	// 构造api实例对象
-	api := &Api{
-		Method:     strings.ToUpper(field.Tag.Get("method")),
-		ReqPath:    field.Tag.Get("route"),
-		Group:      field.Tag.Get("group"),
-		Act:        field.Tag.Get("act"),
-		arrReqType: arrReqType,
-		RspType:    st.Method(0).Type.Out(0),
-		HandleFunc: st.Method(0).Func,
-	}
-
-	// 注册api到服务器
-	GetServer().ApiRegister(api)
-
-	// 构造handle函数
-	handelFunc := func(c *gin.Context) {
-		handleFuncParma := []reflect.Value{
-			reflect.ValueOf(ctrl),
-			reflect.ValueOf(c),
+		field := st.Field(0)
+		if field.Tag.Get("route") == "" {
+			panic("Controller is missing routing configuration")
 		}
 
-		for _, reqType := range arrReqType {
-			if reqType.Kind() != reflect.Pointer {
-				reqType = reflect.PtrTo(reqType)
+		if field.Tag.Get("method") == "" {
+			panic("Controller is missing the configuration of the http method")
+		}
+
+		arrReqType := []reflect.Type{}
+
+		handleFunc, ok := st.MethodByName("Handle")
+		if !ok {
+			panic("The api lacks a handle function")
+		}
+
+		for i := 1; i < handleFunc.Type.NumIn(); i++ {
+			if st.Method(0).Type.In(i) == reflect.TypeOf(&gin.Context{}) {
+				continue
+			}
+			arrReqType = append(arrReqType, st.Method(0).Type.In(i))
+		}
+
+		// 构造api实例对象
+		api := &Api{
+			Method:     strings.ToUpper(field.Tag.Get("method")),
+			ReqPath:    field.Tag.Get("route"),
+			Group:      field.Tag.Get("group"),
+			Act:        field.Tag.Get("act"),
+			arrReqType: arrReqType,
+			RspType:    st.Method(0).Type.Out(0),
+			HandleFunc: st.Method(0).Func,
+		}
+
+		// 注册api到服务器
+		s.ApiRegister(api)
+
+		// 构造handle函数
+		handelFunc := func(c *gin.Context) {
+			handleFuncParma := []reflect.Value{
+				reflect.ValueOf(ctrl),
+				reflect.ValueOf(c),
 			}
 
-			decodeFunc, ok := reqType.MethodByName("ReqDecode")
-			if !ok {
-				panic("request obj error!")
-				return
+			for _, reqType := range arrReqType {
+				if reqType.Kind() != reflect.Pointer {
+					reqType = reflect.PtrTo(reqType)
+				}
+
+				decodeFunc, ok := reqType.MethodByName("ReqDecode")
+				if !ok {
+					panic("request obj error!")
+					return
+				}
+
+				arrRetValue := decodeFunc.Func.Call(
+					[]reflect.Value{reflect.New(reqType.Elem()), reflect.ValueOf(c), reflect.ValueOf(reqType)},
+				)
+
+				param := arrRetValue[0].Interface()
+				err, ok := arrRetValue[1].Interface().(error)
+
+				if ok && err != nil {
+					c.JSON(http.StatusBadRequest, err.Error())
+					return
+				}
+
+				handleFuncParma = append(handleFuncParma, reflect.ValueOf(param))
 			}
 
-			arrRetValue := decodeFunc.Func.Call(
-				[]reflect.Value{reflect.New(reqType.Elem()), reflect.ValueOf(c), reflect.ValueOf(reqType)},
-			)
+			retValue := api.HandleFunc.Call(handleFuncParma)
 
-			param := arrRetValue[0].Interface()
-			err, ok := arrRetValue[1].Interface().(error)
+			if !c.Writer.Written() {
+				c.JSON(200, retValue[0].Interface())
+			}
+		}
 
-			if ok && err != nil {
-				c.JSON(http.StatusBadRequest, err.Error())
-				return
+		// 注册handel函数
+		switch api.Method {
+		case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodTrace,
+			http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodConnect, "ANY":
+
+			if api.Method == "ANY" {
+				s.g.Any(api.ReqPath, handelFunc)
+			} else {
+				s.g.Handle(api.Method, api.ReqPath, handelFunc)
 			}
 
-			handleFuncParma = append(handleFuncParma, reflect.ValueOf(param))
+		default:
+			fmt.Errorf("error Method")
 		}
-
-		retValue := api.HandleFunc.Call(handleFuncParma)
-
-		if !c.Writer.Written() {
-			c.JSON(200, retValue[0].Interface())
-		}
-	}
-
-	// 注册handel函数
-	switch api.Method {
-	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodTrace,
-		http.MethodHead, http.MethodOptions, http.MethodDelete, http.MethodConnect, "ANY":
-
-		if api.Method == "ANY" {
-			Serv.g.Any(api.ReqPath, handelFunc)
-		} else {
-			Serv.g.Handle(api.Method, api.ReqPath, handelFunc)
-		}
-
-	default:
-		fmt.Errorf("error Method")
 	}
 }
 

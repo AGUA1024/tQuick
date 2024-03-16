@@ -69,7 +69,7 @@ type IApi interface {
 }
 
 // Add adds an instance of struct or a route function to OpenApiV3 definition implements.
-func DocInit(s *Server) {
+func (s *Server) ApiDocInit() {
 	apiSet := s.Api
 	c := s.g
 

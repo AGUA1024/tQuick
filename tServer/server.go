@@ -2,22 +2,69 @@ package tServer
 
 import (
 	"fmt"
+	"github.com/AGUA1024/tQuick/global"
+	"github.com/AGUA1024/tQuick/tIServer"
+	"github.com/AGUA1024/tQuick/tLog"
+	"github.com/AGUA1024/tQuick/tMiddleware"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
+	_ "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"net/http"
 )
 
 type Server struct {
-	g   *gin.Engine
+	// Name of the server (服务器的名称)
+	Name string
+
+	// 服务器监听端口号
+	port int
+
+	// 服务器环境
+	env string
+
+	// gin内核
+	g *gin.Engine
+
+	// api集合
 	Api map[string]*ApiSet
+
+	// 数据库
+	Db map[string]*gorm.DB
 }
 
-var Serv = &Server{
+func (s *Server) Run() {
+	s.ApiDocInit()
+
+	err := endless.ListenAndServe(fmt.Sprintf(":%d", s.port), s.g)
+	if err != nil {
+		panic(err)
+	}
+}
+
+var Serv tIServer.IServer = &Server{
 	g:   gin.Default(),
 	Api: map[string]*ApiSet{},
+	Db:  map[string]*gorm.DB{},
 }
 
-func GetServer() *Server {
+func NewServer() tIServer.IServer {
+	Serv = &Server{
+		g:   gin.Default(),
+		Api: map[string]*ApiSet{},
+		Db:  map[string]*gorm.DB{},
+	}
+
+	// 加载服务器配置
+	Serv.LoadConfig()
+
+	// 将Api注册到服务器中
+	Serv.RouteRegister(ServCtrl)
+
+	return Serv
+}
+
+func GetServer() tIServer.IServer {
 	return Serv
 }
 
@@ -58,14 +105,25 @@ func (s *Server) ApiRegister(api *Api) {
 	case "ANY":
 		s.Api[api.ReqPath].Any = f(s.Api[api.ReqPath].Any)
 	default:
-		fmt.Errorf("error Method")
+		panic("error Method")
 	}
 }
 
-func Run(addr string) error {
-	server := GetServer()
+func (s *Server) ServerInit() {
+	serverConf := global.GetGlobalConfig().Server
 
-	DocInit(server)
+	s.Name = serverConf.App
+	s.port = serverConf.Port
+	s.env = serverConf.Env
+}
 
-	return endless.ListenAndServe(addr, server.g)
+func (s *Server) LoadConfig() {
+	// 日志组件初始化
+	tLog.LogInit()
+
+	// 数据库初始化
+	tMiddleware.DbInit()
+
+	// 服务器初始化
+	s.ServerInit()
 }
