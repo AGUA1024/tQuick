@@ -15,7 +15,7 @@ import (
 var DEFAULT_TIME_TYPE = zapcore.TimeEncoderOfLayout(time.DateTime)
 
 type tLogger struct {
-	LogCore    *zap.Logger
+	LogCore    *zap.SugaredLogger
 	LogPath    string
 	Level      string
 	MaxSize    int
@@ -26,16 +26,36 @@ type tLogger struct {
 
 var Logger = &tLogger{}
 
-func Info(msg string, fields ...zap.Field) {
-	Logger.LogCore.Info(msg, fields...)
+func Debug(args ...interface{}) {
+	Logger.LogCore.Debug(args...)
 }
 
-func Debug(msg string, fields ...zap.Field) {
-	Logger.LogCore.Debug(msg, fields...)
+func Debugf(template string, args ...interface{}) {
+	Logger.LogCore.Debugf(template, args...)
 }
 
-func Error(msg string, fields ...zap.Field) {
-	Logger.LogCore.Error(msg, fields...)
+func Info(args ...interface{}) {
+	Logger.LogCore.Info(args...)
+}
+
+func Infof(template string, args ...interface{}) {
+	Logger.LogCore.Infof(template, args...)
+}
+
+func Warn(args ...interface{}) {
+	Logger.LogCore.Warn(args...)
+}
+
+func Warnf(template string, args ...interface{}) {
+	Logger.LogCore.Warnf(template, args...)
+}
+
+func Error(args ...interface{}) {
+	Logger.LogCore.Error(args...)
+}
+
+func Errorf(template string, args ...interface{}) {
+	Logger.LogCore.Errorf(template, args...)
 }
 
 func (l *tLogger) GetLevel() string {
@@ -88,12 +108,8 @@ func LogInit() {
 	encoder := zapcore.NewConsoleEncoder(encoderConfig)
 
 	//日志级别判定
-	gameErrPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool { //error级别
+	errorPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool { //error级别
 		return lev == zap.ErrorLevel
-	})
-
-	sysErrPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool { //error级别
-		return lev > zap.ErrorLevel
 	})
 
 	lowPriority := zap.LevelEnablerFunc(func(lev zapcore.Level) bool { //info和debug级别,debug级别是最低的
@@ -110,7 +126,6 @@ func LogInit() {
 	})
 	infoFileCore := zapcore.NewCore(encoder, zapcore.NewMultiWriteSyncer(infoFileWriteSyncer, zapcore.AddSync(os.Stdout)), lowPriority) //第三个及之后的参数为写入文件的日志级别,ErrorLevel模式只记录error级别的日志
 
-	fmt.Println(logConf.LogPath + "/error_" + time.Now().Format(time.DateOnly) + ".log")
 	//error文件writeSyncer
 	errorFileWriteSyncer := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   logConf.LogPath + "/error_" + time.Now().Format(time.DateOnly) + ".log", //日志文件存放目录
@@ -119,20 +134,9 @@ func LogInit() {
 		MaxAge:     logConf.MaxAge,                                                          //日志文件保留天数
 		Compress:   logConf.IsCompress,                                                      //是否压缩处理
 	})
-	errorFileCore := zapcore.NewCore(encoder, zapcore.NewMultiWriteSyncer(errorFileWriteSyncer, zapcore.AddSync(os.Stdout)), gameErrPriority) //第三个及之后的参数为写入文件的日志级别,ErrorLevel模式只记录error级别的日志
-
-	//panic文件writeSyncer
-	panicFileWriteSyncer := zapcore.AddSync(&lumberjack.Logger{
-		Filename:   logConf.LogPath + "/sysErr_" + time.Now().Format(time.DateOnly) + ".log", //日志文件存放目录
-		MaxSize:    logConf.MaxSize,                                                          //文件大小限制,单位MB
-		MaxBackups: logConf.MaxBackups,                                                       //最大保留日志文件数量
-		MaxAge:     logConf.MaxAge,                                                           //日志文件保留天数
-		Compress:   logConf.IsCompress,                                                       //是否压缩处理
-	})
-	panicFileCore := zapcore.NewCore(encoder, zapcore.NewMultiWriteSyncer(panicFileWriteSyncer, zapcore.AddSync(os.Stdout)), sysErrPriority) //第三个及之后的参数为写入文件的日志级别,ErrorLevel模式只记录error级别的日志
+	errorFileCore := zapcore.NewCore(encoder, zapcore.NewMultiWriteSyncer(infoFileWriteSyncer, errorFileWriteSyncer, zapcore.AddSync(os.Stdout)), errorPriority) //第三个及之后的参数为写入文件的日志级别,ErrorLevel模式只记录error级别的日志
 
 	coreArr = append(coreArr, infoFileCore)
 	coreArr = append(coreArr, errorFileCore)
-	coreArr = append(coreArr, panicFileCore)
-	Logger.LogCore = zap.New(zapcore.NewTee(coreArr...), zap.AddCaller()) //zap.AddCaller()为显示文件名和行号，可省略
+	Logger.LogCore = zap.New(zapcore.NewTee(coreArr...), zap.AddCaller()).Sugar() //zap.AddCaller()为显示文件名和行号，可省略
 }

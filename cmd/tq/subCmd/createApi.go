@@ -1,6 +1,7 @@
 package subCmd
 
 import (
+	"embed"
 	"fmt"
 	"github.com/spf13/cobra"
 	"os"
@@ -13,41 +14,8 @@ type apiTempVar struct {
 	ApiName string
 }
 
-const apiTemplate = `package {{.ApiName}}
-
-import (
-	"github.com/gin-gonic/gin"
-	"github.com/AGUA1024/tQuick/tServer"
-)
-
-func init() {
-	tServer.RouteRegister({{.ApiName}}{})
-}
-
-type {{.ApiName}} struct {
-	tServer.Controller ` + "`route:\"{{.ApiName}}.routePath\" method:\"{{.ApiName}}.method\" group:\"{{.ApiName}}.group\" act:\"{{.ApiName}}.act\"`" + `
-}
-
-type {{.ApiName}}ReqUri struct {
-	tServer.HttpUri
-}
-
-type {{.ApiName}}ReqHeader struct {
-	tServer.HttpHeader
-}
-
-type {{.ApiName}}Req struct {
-	tServer.HttpJsonBody
-}
-
-type {{.ApiName}}Rsp struct {
-}
-
-func (api {{.ApiName}}) Handle(ctx *gin.Context, head *{{.ApiName}}ReqHeader, req *{{.ApiName}}Req, uri *{{.ApiName}}ReqUri) *{{.ApiName}}Rsp {
-	panic("Not Implemented")
-	return nil
-}
-`
+//go:embed createApi.tpl
+var createApiTplFS embed.FS
 
 func init() {
 	CreateApiCmd.Flags().StringVarP(new(string), "name", "n", "", "ApiName")
@@ -58,6 +26,7 @@ var CreateApiCmd = &cobra.Command{
 	Short: "Generate api code",
 	Long:  `One click generates api code according to the name of the api`,
 	Run: func(cmd *cobra.Command, args []string) {
+		tpl := "createApi.tpl"
 		cmdName, _ := cmd.Flags().GetString("name")
 		if cmdName == "" {
 			panic("ApiName is empty, Please enter the input parameters in the format of \"{pkgName}.{apiName}\"")
@@ -97,7 +66,8 @@ var CreateApiCmd = &cobra.Command{
 			}
 		}
 
-		tmpl, err := template.New("apiTemp").Parse(apiTemplate)
+		templateFile, err := createApiTplFS.ReadFile(tpl)
+		tmpl, err := template.New("apiTemp").Parse(string(templateFile))
 		if err != nil {
 			panic(err)
 		}
