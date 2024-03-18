@@ -15,9 +15,11 @@ type tQucikConf struct {
 }
 
 type Server struct {
-	App  string `yaml:"app"`
-	Env  string `yaml:"env"`
-	Port int    `yaml:"port"`
+	App     string `yaml:"app"`
+	Version string `yaml:"version"`
+	Env     string `yaml:"env"`
+	Port    int    `yaml:"port"`
+	ApiDoc  string `yaml:"apidoc"`
 }
 
 type DbInfo struct {

@@ -1,13 +1,25 @@
 package tServer
 
 import (
+	"embed"
 	"encoding/json"
+	"fmt"
+	"github.com/AGUA1024/tQuick/global"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/gin-gonic/gin"
+	"io/fs"
+	"net/http"
+	"path"
 	"reflect"
 	"regexp"
 	"strings"
 )
+
+//go:embed kenife4j/doc.html
+var docHtmlFiles embed.FS
+
+//go:embed kenife4j/webjars/*
+var webjarsFiles embed.FS
 
 // OpenApiV3 is the structure defined from:
 // https://swagger.io/specification/
@@ -73,21 +85,36 @@ func (s *Server) ApiDocInit() {
 	apiSet := s.Api
 	c := s.g
 
+	appName := global.GetGlobalConfig().Server.App
+	version := global.GetGlobalConfig().Server.Version
+	apiDoc := global.GetGlobalConfig().Server.ApiDoc
+	apiPathDir := path.Dir(apiDoc)
+
 	c.GET("/knife4j/openapi.json", func(c *gin.Context) {
-		c.String(200, `[
+		c.String(200, fmt.Sprintf(`[
 			{
-				"name": "tQuick服务器接口文档",
+				"name": "%s",
 				"url": "/data/knife4j.json",
 				"swaggerVersion": "2.0",
 				"location": "/"
 			}
-		]`)
+		]`, appName))
 	})
 
+	docHtmlData, err := docHtmlFiles.ReadFile("kenife4j/doc.html")
+	if err != nil {
+		panic(err)
+	}
+
+	// 使用嵌入的静态文件作为文件系统
+	embeddedStaticFiles, _ := fs.Sub(webjarsFiles, "kenife4j/webjars")
 	// 绑定静态资源
-	c.StaticFile("/doc.html", "../kenife4j/doc.html")
-	c.Static("/webjars/js", "../kenife4j/webjars/js")
-	c.Static("/webjars/css", "../kenife4j/webjars/css")
+	c.GET(apiDoc, func(c *gin.Context) {
+		c.Header("Content-Type", "text/html")
+		c.String(200, string(docHtmlData))
+	})
+
+	c.StaticFS(fmt.Sprintf("%s/webjars", apiPathDir), http.FS(embeddedStaticFiles))
 
 	routPaths := map[string]openApi.Path{}
 	components := map[string]*openApi.SchemaRef{}
@@ -132,12 +159,12 @@ func (s *Server) ApiDocInit() {
 			Callbacks:       nil,
 		},
 		Info: openApi.Info{
-			Title:          "OpenApiV3.Info.Title",
+			Title:          appName,
 			Description:    "OpenApiV3.Info.Description",
 			TermsOfService: "OpenApiV3.Info.TermsOfService",
 			Contact:        nil,
 			License:        nil,
-			Version:        "OpenApiV3.Info.Version",
+			Version:        version,
 		},
 		Paths:        routPaths,
 		Security:     nil,
@@ -149,7 +176,7 @@ func (s *Server) ApiDocInit() {
 	json, _ := json.Marshal(oai)
 	openApiV3Str := string(json)
 
-	c.GET("/data/knife4j.json", func(c *gin.Context) {
+	c.GET(fmt.Sprintf("%s/data/knife4j.json", apiPathDir), func(c *gin.Context) {
 		c.String(200, openApiV3Str)
 	})
 }
