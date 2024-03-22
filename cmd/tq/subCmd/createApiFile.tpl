@@ -1,4 +1,4 @@
-package {{.ApiName}}
+package {{.PkgName}}
 
 import (
 	"github.com/gin-gonic/gin"
@@ -6,11 +6,13 @@ import (
 )
 
 func init() {
-	tServer.RouteRegister({{.ApiName}}{})
+	tServer.RouteRegister(
+	    &{{.ApiName}}{},
+	)
 }
 
 type {{.ApiName}} struct {
-	tServer.Controller `route:"{{.ApiName}}.routePath" method:"{{.ApiName}}.method" group:"{{.ApiName}}.group" act:"{{.ApiName}}.act"`
+	{{.ApiGroupName}}RoutGroup `route:"{{.ApiName}}.routePath" method:"POST" act:"{{.ApiName}}.act"`
 }
 
 type {{.ApiName}}ReqUri struct {
@@ -28,7 +30,7 @@ type {{.ApiName}}Req struct {
 type {{.ApiName}}Rsp struct {
 }
 
-func (api {{.ApiName}}) Handle(ctx *gin.Context, head *{{.ApiName}}ReqHeader, req *{{.ApiName}}Req, uri *{{.ApiName}}ReqUri) *{{.ApiName}}Rsp {
+func (api *{{.ApiName}}) Handle(ctx *gin.Context, head *{{.ApiName}}ReqHeader, req *{{.ApiName}}Req, uri *{{.ApiName}}ReqUri) *{{.ApiName}}Rsp {
 	panic("Not Implemented")
 	return nil
 }

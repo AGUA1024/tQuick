@@ -10,7 +10,7 @@ type IServer interface {
 	LoadConfig()
 
 	// 路由注册
-	RouteRegister(ctrl []tIRoute.IController)
+	RouteRegister(ServSet map[string][]tIRoute.IController)
 
 	// Api文档初始化
 	ApiDocInit()

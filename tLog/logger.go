@@ -138,5 +138,5 @@ func LogInit() {
 
 	coreArr = append(coreArr, infoFileCore)
 	coreArr = append(coreArr, errorFileCore)
-	Logger.LogCore = zap.New(zapcore.NewTee(coreArr...), zap.AddCaller()).Sugar() //zap.AddCaller()为显示文件名和行号，可省略
+	Logger.LogCore = zap.New(zapcore.NewTee(coreArr...), zap.AddCaller(), zap.AddCallerSkip(1)).Sugar() //zap.AddCaller()为显示文件名和行号，可省略
 }

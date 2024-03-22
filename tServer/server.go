@@ -59,7 +59,7 @@ func NewServer() tIServer.IServer {
 	Serv.LoadConfig()
 
 	// 将Api注册到服务器中
-	Serv.RouteRegister(ServCtrl)
+	Serv.RouteRegister(RouteGroupMiddlewaresMap)
 
 	return Serv
 }
