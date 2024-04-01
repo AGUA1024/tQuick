@@ -7850,8 +7850,9 @@
                 r.springdoc || !i.oas2) {
                     var c = window.location.pathname
                         , p = "";
-                    new RegExp("(.*?)/doc.html.*$","ig").test(c) && (p = RegExp.$1),
-                        o += p
+                    // tzy：解决文档中api总是会带上服务器根请求路径问题
+                    // new RegExp("(.*?)/doc.html.*$","ig").test(c) && (p = RegExp.$1),
+                    //     o += p
                 }
                 var u = o += e;
                 if (re.a.strNotBlank(r.currentInstance.servicePath)) {
