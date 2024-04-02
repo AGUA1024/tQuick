@@ -33,6 +33,7 @@ func init() {
 
 var CreateDbModelCmd = &cobra.Command{
 	Use:   "create-model",
+	Aliases: []string{"cm"},
 	Short: "Get the database data model",
 	Long:  `One click generates DbModel code according to the Link of the database and the tableName`,
 	Run: func(cmd *cobra.Command, args []string) {

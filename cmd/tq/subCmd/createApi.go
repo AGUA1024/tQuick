@@ -21,28 +21,13 @@ var createApiTplFS embed.FS
 //go:embed createApiGroupFile.tpl
 var createApiGroupTplFS embed.FS
 
-// FirstLower 字符串首字母小写
-func FirstLower(s string) string {
-	if s == "" {
-		return ""
-	}
-	return strings.ToLower(s[:1]) + s[1:]
-}
-
-// FirstUpper 字符串首字母大写
-func FirstUpper(s string) string {
-	if s == "" {
-		return ""
-	}
-	return strings.ToUpper(s[:1]) + s[1:]
-}
-
 func init() {
 	CreateApiCmd.Flags().StringVarP(new(string), "name", "n", "", "ApiName")
 }
 
 var CreateApiCmd = &cobra.Command{
 	Use:   "create-api",
+	Aliases: []string{"ca"},
 	Short: "Generate api code",
 	Long:  `One click generates api code according to the name of the api`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -150,4 +135,20 @@ var CreateApiCmd = &cobra.Command{
 
 		fmt.Printf("Create Api Success: %s", apiFile)
 	},
+}
+
+// FirstLower 字符串首字母小写
+func FirstLower(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToLower(s[:1]) + s[1:]
+}
+
+// FirstUpper 字符串首字母大写
+func FirstUpper(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
