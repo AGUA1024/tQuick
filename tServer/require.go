@@ -92,8 +92,16 @@ func (j *HttpQuery) GetHttpParmaType() string {
 	return "query"
 }
 
+func (j *HttpParam) GetHttpParmaType() string {
+	return "param"
+}
+
 func (j *HttpParam) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 	return nil, errors.New("todo")
+}
+
+func (j *HttpForm) GetHttpParmaType() string {
+	return "form"
 }
 
 func (j *HttpForm) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {

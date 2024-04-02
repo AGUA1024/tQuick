@@ -314,7 +314,6 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 	return
 }
 
-// 判断request json对象必选参数是否缺失
 func getSchemaRef(tp reflect.Type) (*openApi.SchemaRef, []reflect.Type) {
 	properties := map[string]any{}
 	arrRequired := []string{}

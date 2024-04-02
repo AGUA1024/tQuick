@@ -223,6 +223,7 @@ func getOpts(methodApi *Api) *openApi.Operation {
 					Name:        parma.Name,
 					In:          InType,
 					Description: "Parameter.Description",
+					Required:    required,
 					Schema: &openApi.SchemaRef{
 						Ref: "#/components/schemas/" + parma.Type.PkgPath() + "/" + parma.Type.Name(),
 					},
