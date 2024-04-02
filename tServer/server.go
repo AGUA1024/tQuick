@@ -1,17 +1,48 @@
 package tServer
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/AGUA1024/tQuick/global"
 	"github.com/AGUA1024/tQuick/tIServer"
 	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/AGUA1024/tQuick/tMiddleware"
+	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
 	_ "gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"io/fs"
 	"net/http"
+	"path"
+	"regexp"
 )
+
+var Serv tIServer.IServer = &Server{
+	g:   gin.Default(),
+	Api: map[string]*ApiSet{},
+	Db:  map[string]*gorm.DB{},
+}
+
+func NewServer() tIServer.IServer {
+	Serv = &Server{
+		g:   gin.Default(),
+		Api: map[string]*ApiSet{},
+		Db:  map[string]*gorm.DB{},
+	}
+
+	// 加载服务器配置
+	Serv.LoadConfig()
+
+	// 将Api注册到服务器中
+	Serv.RouteRegister(RouteGroupMiddlewaresMap)
+
+	return Serv
+}
+
+func GetServer() tIServer.IServer {
+	return Serv
+}
 
 type Server struct {
 	// Name of the server (服务器的名称)
@@ -38,34 +69,8 @@ func (s *Server) Run() {
 
 	err := endless.ListenAndServe(fmt.Sprintf(":%d", s.port), s.g)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("<In Run> %v",err))
 	}
-}
-
-var Serv tIServer.IServer = &Server{
-	g:   gin.Default(),
-	Api: map[string]*ApiSet{},
-	Db:  map[string]*gorm.DB{},
-}
-
-func NewServer() tIServer.IServer {
-	Serv = &Server{
-		g:   gin.Default(),
-		Api: map[string]*ApiSet{},
-		Db:  map[string]*gorm.DB{},
-	}
-
-	// 加载服务器配置
-	Serv.LoadConfig()
-
-	// 将Api注册到服务器中
-	Serv.RouteRegister(RouteGroupMiddlewaresMap)
-
-	return Serv
-}
-
-func GetServer() tIServer.IServer {
-	return Serv
 }
 
 // s.Api map[string]*Api  path => api
@@ -105,7 +110,7 @@ func (s *Server) ApiRegister(api *Api) {
 	case "ANY":
 		s.Api[api.ReqPath].Any = f(s.Api[api.ReqPath].Any)
 	default:
-		panic("error Method")
+		panic("<In ApiRegister> error Method")
 	}
 }
 
@@ -126,4 +131,104 @@ func (s *Server) LoadConfig() {
 
 	// 服务器初始化
 	s.ServerInit()
+}
+
+// Add adds an instance of struct or a route function to OpenApiV3 definition implements.
+func (s *Server) ApiDocInit() {
+	apiSet := s.Api
+	c := s.g
+	appName := global.GetGlobalConfig().Server.App
+	version := global.GetGlobalConfig().Server.Version
+	apiDoc := global.GetGlobalConfig().Server.ApiDoc
+	apiPathDir := path.Dir(apiDoc)
+
+	c.GET("/knife4j/openapi.json", func(c *gin.Context) {
+		c.String(http.StatusOK, fmt.Sprintf(`[
+			{
+				"name": "%s",
+				"url": "/data/knife4j.json",
+				"swaggerVersion": "2.0",
+				"location": "/"
+			}
+		]`, appName))
+	})
+
+	docHtmlData, err := docHtmlFiles.ReadFile("kenife4j/doc.html")
+	if err != nil {
+		panic(fmt.Sprintf("<In ApiDocInit> %v", err))
+	}
+
+	// 使用嵌入的静态文件作为文件系统
+	embeddedStaticFiles, _ := fs.Sub(webjarsFiles, "kenife4j/webjars")
+	// 绑定静态资源
+	c.GET(apiDoc, func(c *gin.Context) {
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, string(docHtmlData))
+	})
+
+	c.StaticFS(fmt.Sprintf("%s/webjars", apiPathDir), http.FS(embeddedStaticFiles))
+
+	routPaths := map[string]openApi.Path{}
+	components := map[string]*openApi.SchemaRef{}
+
+	for reqPath, v := range apiSet {
+		getComponents(components, v)
+
+		// 请求路径，文档参数兼容动态路由类型
+		re := regexp.MustCompile(`:(\w+)`)
+		newPath := re.ReplaceAllString(reqPath, "{$1}")
+
+		routPaths[newPath] = openApi.Path{
+			Ref:         "",
+			Summary:     "",
+			Description: "",
+			Connect:     getOpts(v.Connect),
+			Delete:      getOpts(v.Delete),
+			Get:         getOpts(v.Get),
+			Head:        getOpts(v.Head),
+			Options:     getOpts(v.Options),
+			Patch:       getOpts(v.Patch),
+			Post:        getOpts(v.Post),
+			Put:         getOpts(v.Put),
+			Trace:       getOpts(v.Trace),
+			Servers:     nil,
+			Parameters:  nil,
+		}
+	}
+
+	oai := &OpenApiV3{
+		Config:  openApi.Config{},
+		OpenAPI: "3.0.0",
+		Components: openApi.Components{
+			Schemas:         components,
+			Parameters:      nil,
+			Headers:         nil,
+			RequestBodies:   nil,
+			Responses:       nil,
+			SecuritySchemes: nil,
+			Examples:        nil,
+			Links:           nil,
+			Callbacks:       nil,
+		},
+		Info: openApi.Info{
+			Title:          appName,
+			Description:    "OpenApiV3.Info.Description",
+			TermsOfService: "OpenApiV3.Info.TermsOfService",
+			Contact:        nil,
+			License:        nil,
+			Version:        version,
+		},
+		Paths:        routPaths,
+		Security:     nil,
+		Servers:      nil,
+		Tags:         nil,
+		ExternalDocs: nil,
+	}
+
+	json, _ := json.Marshal(oai)
+	openApiV3Str := string(json)
+
+	c.GET(fmt.Sprintf("%s/data/knife4j.json", apiPathDir), func(c *gin.Context) {
+		c.String(http.StatusOK, openApiV3Str)
+	})
 }

@@ -9,6 +9,15 @@ import (
 	"reflect"
 )
 
+const (
+	ParameterInHeader = `header`
+	ParameterInPath   = `path`
+	ParameterInQuery  = `query`
+	ParameterInBody   = `body`
+	ParameterInParam  = `param`
+	ParameterInForm   = `form`
+)
+
 type HttpJsonBody struct {
 }
 
@@ -26,6 +35,31 @@ type HttpForm struct {
 
 type HttpUri struct {
 }
+
+func (j *HttpJsonBody) GetHttpParmaType() string {
+	return ParameterInBody
+}
+
+func (j *HttpHeader) GetHttpParmaType() string {
+	return ParameterInHeader
+}
+
+func (j *HttpQuery) GetHttpParmaType() string {
+	return ParameterInQuery
+}
+
+func (j *HttpParam) GetHttpParmaType() string {
+	return ParameterInParam
+}
+
+func (j *HttpForm) GetHttpParmaType() string {
+	return ParameterInForm
+}
+
+func (j *HttpUri) GetHttpParmaType() string {
+	return ParameterInPath
+}
+
 
 func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 	reqBodyJson, _ := c.GetRawData()
@@ -47,10 +81,6 @@ func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, err
 	return param, nil
 }
 
-func (j *HttpJsonBody) GetHttpParmaType() string {
-	return "body"
-}
-
 func (j *HttpHeader) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 	param := reflect.New(reqType.Elem()).Interface()
 	err := c.BindHeader(param)
@@ -65,9 +95,6 @@ func (j *HttpHeader) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error
 	return param, nil
 }
 
-func (j *HttpHeader) GetHttpParmaType() string {
-	return "header"
-}
 
 func (j *HttpQuery) ReqDecode(c *gin.Context, reqType reflect.Type) (interface{}, error) {
 	param := reflect.New(reqType.Elem()).Interface()
@@ -88,21 +115,10 @@ func (j *HttpQuery) ReqDecode(c *gin.Context, reqType reflect.Type) (interface{}
 	return param, nil
 }
 
-func (j *HttpQuery) GetHttpParmaType() string {
-	return "query"
-}
-
-func (j *HttpParam) GetHttpParmaType() string {
-	return "param"
-}
-
 func (j *HttpParam) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 	return nil, errors.New("todo")
 }
 
-func (j *HttpForm) GetHttpParmaType() string {
-	return "form"
-}
 
 func (j *HttpForm) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 	return nil, errors.New("todo")
@@ -131,8 +147,4 @@ func (j *HttpUri) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 		return nil, errors.New("Invalid Json Uri: Http QueryParma Missed")
 	}
 	return param, nil
-}
-
-func (j *HttpUri) GetHttpParmaType() string {
-	return "path"
 }

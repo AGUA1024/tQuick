@@ -59,11 +59,11 @@ func LoadConfig(configPath string) {
 	// 寻找配置文件并读取
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(fmt.Errorf("fatal error config file: %w", err))
+		panic(fmt.Errorf("<In LoadConfig> fatal error config file: %w", err))
 	}
 
 	err = viper.Unmarshal(&globalConfig)
 	if err != nil {
-		panic(fmt.Errorf("unable to decode into struct, %v", err))
+		panic(fmt.Errorf("<In LoadConfig> unable to decode into struct, %v", err))
 	}
 }

@@ -2,16 +2,9 @@ package tServer
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
-	"github.com/AGUA1024/tQuick/global"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
-	"github.com/gin-gonic/gin"
-	"io/fs"
-	"net/http"
-	"path"
 	"reflect"
-	"regexp"
 	"strings"
 )
 
@@ -37,15 +30,17 @@ type OpenApiV3 struct {
 }
 
 const (
-	TypeInteger    = `integer`
-	TypeNumber     = `number`
-	TypeBoolean    = `boolean`
-	TypeArray      = `array`
-	TypeString     = `string`
-	TypeFile       = `file`
-	TypeObject     = `object`
+	TypeInteger = `integer`
+	TypeNumber  = `number`
+	TypeBoolean = `boolean`
+	TypeArray   = `array`
+	TypeString  = `string`
+	TypeFile    = `file`
+	TypeObject  = `object`
+
 	FormatInt32    = `int32`
 	FormatInt64    = `int64`
+	FormatFloat    = `float`
 	FormatDouble   = `double`
 	FormatByte     = `byte`
 	FormatBinary   = `binary`
@@ -54,131 +49,11 @@ const (
 	FormatPassword = `password`
 )
 
-const (
-	ParameterInHeader = `header`
-	ParameterInPath   = `path`
-	ParameterInQuery  = `query`
-	ParameterInBody   = `body`
-)
-
-type Code interface {
-	// Code returns the integer number of current error code.
-	Code() int
-
-	// Message returns the brief message for current error code.
-	Message() string
-
-	// Detail returns the detailed information of current error code,
-	// which is mainly designed as an extension field for error code.
-	Detail() interface{}
-}
-
 type IApi interface {
 	GetAct() string
 	GetMethod() string
 	GetReqPath() string
 	GetGroup() string
-}
-
-// Add adds an instance of struct or a route function to OpenApiV3 definition implements.
-func (s *Server) ApiDocInit() {
-	apiSet := s.Api
-	c := s.g
-
-	appName := global.GetGlobalConfig().Server.App
-	version := global.GetGlobalConfig().Server.Version
-	apiDoc := global.GetGlobalConfig().Server.ApiDoc
-	apiPathDir := path.Dir(apiDoc)
-
-	c.GET("/knife4j/openapi.json", func(c *gin.Context) {
-		c.String(200, fmt.Sprintf(`[
-			{
-				"name": "%s",
-				"url": "/data/knife4j.json",
-				"swaggerVersion": "2.0",
-				"location": "/"
-			}
-		]`, appName))
-	})
-
-	docHtmlData, err := docHtmlFiles.ReadFile("kenife4j/doc.html")
-	if err != nil {
-		panic(err)
-	}
-
-	// 使用嵌入的静态文件作为文件系统
-	embeddedStaticFiles, _ := fs.Sub(webjarsFiles, "kenife4j/webjars")
-	// 绑定静态资源
-	c.GET(apiDoc, func(c *gin.Context) {
-		c.Header("Content-Type", "text/html")
-		c.String(200, string(docHtmlData))
-	})
-
-	c.StaticFS(fmt.Sprintf("%s/webjars", apiPathDir), http.FS(embeddedStaticFiles))
-
-	routPaths := map[string]openApi.Path{}
-	components := map[string]*openApi.SchemaRef{}
-
-	for reqPath, v := range apiSet {
-		getComponents(components, v)
-
-		// 请求路径，文档参数兼容动态路由类型
-		re := regexp.MustCompile(`:(\w+)`)
-		newPath := re.ReplaceAllString(reqPath, "{$1}")
-
-		routPaths[newPath] = openApi.Path{
-			Ref:         "",
-			Summary:     "",
-			Description: "",
-			Connect:     getOpts(v.Connect),
-			Delete:      getOpts(v.Delete),
-			Get:         getOpts(v.Get),
-			Head:        getOpts(v.Head),
-			Options:     getOpts(v.Options),
-			Patch:       getOpts(v.Patch),
-			Post:        getOpts(v.Post),
-			Put:         getOpts(v.Put),
-			Trace:       getOpts(v.Trace),
-			Servers:     nil,
-			Parameters:  nil,
-		}
-	}
-
-	oai := &OpenApiV3{
-		Config:  openApi.Config{},
-		OpenAPI: "3.0.0",
-		Components: openApi.Components{
-			Schemas:         components,
-			Parameters:      nil,
-			Headers:         nil,
-			RequestBodies:   nil,
-			Responses:       nil,
-			SecuritySchemes: nil,
-			Examples:        nil,
-			Links:           nil,
-			Callbacks:       nil,
-		},
-		Info: openApi.Info{
-			Title:          appName,
-			Description:    "OpenApiV3.Info.Description",
-			TermsOfService: "OpenApiV3.Info.TermsOfService",
-			Contact:        nil,
-			License:        nil,
-			Version:        version,
-		},
-		Paths:        routPaths,
-		Security:     nil,
-		Servers:      nil,
-		Tags:         nil,
-		ExternalDocs: nil,
-	}
-
-	json, _ := json.Marshal(oai)
-	openApiV3Str := string(json)
-
-	c.GET(fmt.Sprintf("%s/data/knife4j.json", apiPathDir), func(c *gin.Context) {
-		c.String(200, openApiV3Str)
-	})
 }
 
 func getOpts(methodApi *Api) *openApi.Operation {
@@ -196,7 +71,7 @@ func getOpts(methodApi *Api) *openApi.Operation {
 		// 方法是指针类型的方法
 		getHttpTypeFunc, ok := reflect.PointerTo(reqType).MethodByName("GetHttpParmaType")
 		if !ok {
-			panic("GetHttpParmaType Error")
+			panic("<In getOpts> GetHttpParmaType Error")
 		}
 
 		arrRetValue := getHttpTypeFunc.Func.Call(
@@ -269,4 +144,25 @@ func getOpts(methodApi *Api) *openApi.Operation {
 		Servers:      nil,
 		ExternalDocs: nil,
 	}
+}
+
+func goType2SwaggerTypeAndFormat(typeName string) (swaggerType, swaggerFormat string) {
+	switch typeName {
+	case "int", "int32":
+		return TypeInteger, FormatInt32
+	case "int64":
+		return TypeInteger, FormatInt64
+	case "float32":
+		return TypeNumber, FormatFloat
+	case "float64":
+		return TypeNumber, FormatDouble
+	case "string":
+		return TypeString,""
+	case "uint8":
+		return TypeString, FormatByte
+	case "bool":
+		return TypeBoolean, ""
+	}
+
+	panic(fmt.Sprintf("<In goType2SwaggerTypeAndFormat> ErrorType:[%s]", typeName))
 }

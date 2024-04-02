@@ -20,14 +20,3 @@ type Path struct {
 
 // Paths are specified by OpenAPI/Swagger standard version 3.0.
 type Paths map[string]Path
-
-const (
-	responseOkKey = `200`
-)
-
-type addPathInput struct {
-	Path     string      // Precise route path.
-	Prefix   string      // Route path prefix.
-	Method   string      // Route method.
-	Function interface{} // Uniformed function.
-}

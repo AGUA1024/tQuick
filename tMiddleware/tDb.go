@@ -1,6 +1,7 @@
 package tMiddleware
 
 import (
+	"fmt"
 	"github.com/AGUA1024/tQuick/global"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -24,7 +25,7 @@ func DbInit() {
 			for _, vv := range v {
 				db, err := gorm.Open(mysql.Open(vv.Target), &gorm.Config{})
 				if err != nil {
-					panic(err)
+					panic(fmt.Sprintf("<In DbInit> %v",err))
 				}
 
 				Db.Mysql[vv.Name] = db

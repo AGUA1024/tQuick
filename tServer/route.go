@@ -100,7 +100,7 @@ func RouteGroupRegister(routeGroup tIRoute.IController, middlewares ...gin.Handl
 	group := routeGroup.GetRouteGroup()
 
 	if group == "" {
-		panic("RouteGroup is missing group configuration")
+		panic("<In RouteGroupRegister> RouteGroup is missing group configuration")
 	}
 
 	// 给路由组的路由全部注册上中间件
@@ -122,18 +122,18 @@ func (s Server) RouteRegister(RouteGroupMiddlewaresMap map[string][]tIRoute.ICon
 			}
 
 			if field.Tag.Get("route") == "" {
-				panic("Controller is missing routing configuration")
+				panic("<In RouteRegister> Controller is missing routing configuration")
 			}
 
 			if field.Tag.Get("method") == "" {
-				panic("Controller is missing the configuration of the http method")
+				panic("<In RouteRegister> Controller is missing the configuration of the http method")
 			}
 
 			arrReqType := []reflect.Type{}
 
 			handleFunc, ok := st.MethodByName("Handle")
 			if !ok {
-				panic("The api lacks a handle function")
+				panic("<In RouteRegister> The api lacks a handle function")
 			}
 
 			for i := 1; i < handleFunc.Type.NumIn(); i++ {
@@ -172,7 +172,7 @@ func (s Server) RouteRegister(RouteGroupMiddlewaresMap map[string][]tIRoute.ICon
 
 					decodeFunc, ok := reqType.MethodByName("ReqDecode")
 					if !ok {
-						panic("request obj error!")
+						panic("<In RouteRegister> request obj error!")
 						return
 					}
 
@@ -338,13 +338,13 @@ func getSchemaRef(tp reflect.Type) (*openApi.SchemaRef, []reflect.Type) {
 				Description: field.Tag.Get("desc"),
 				Ref:         "#/components/schemas/" + field.Type.PkgPath() + "/" + field.Type.Name(),
 			}
-
 			arrParamType = append(arrParamType, field.Type)
 		} else { // 常规类型
+			swgType,swgFormat := goType2SwaggerTypeAndFormat(field.Type.Name())
 			properties[field.Name] = openApi.Propertie{
-				Format:      field.Type.Name(),
 				Description: field.Tag.Get("desc"),
-				Type:        field.Type.Name(),
+				Type:        swgType,
+				Format:      swgFormat,
 			}
 		}
 	}
