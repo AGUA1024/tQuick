@@ -109,11 +109,24 @@ func (j *HttpFormData) ReqDecode(c *gin.Context, reqType reflect.Type) (any, err
 
 	dictFormData, _ := c.MultipartForm()
 
+	// 预处理，兼容数组类型
+	preprocessedData := make(map[string][]string)
+	for key, values := range dictFormData.Value {
+		for _, value := range values {
+			var arr []string
+			if err := json.Unmarshal([]byte(value), &arr); err == nil {
+				preprocessedData[key] = append(preprocessedData[key], arr...)
+			} else {
+				preprocessedData[key] = append(preprocessedData[key], value)
+			}
+		}
+	}
+
 	decoder := schema.NewDecoder()
 	decoder.IgnoreUnknownKeys(true) // 忽略未知键
 	decoder.ZeroEmpty(true)         // 将空字符串解码为零值
 
-	err := decoder.Decode(param, dictFormData.Value)
+	err := decoder.Decode(param, preprocessedData)
 	if err != nil {
 		return nil, errors.New("<In HttpFormData.ReqDecode> Invalid Http FormData:" + err.Error())
 	}

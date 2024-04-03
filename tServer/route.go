@@ -287,18 +287,6 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 				schemaRefs[tp.PkgPath()+"/"+tp.Name()] = ref
 			}
 		}
-
-		//schemaRefs[api.ReqType.Elem().PkgPath()+"/"+api.ReqType.Elem().Name()] = &openApi.SchemaRef{
-		//	Properties: getParmas(api.ReqType),
-		//	Type:       api.ReqType.Name(),
-		//	Required:   []string{},
-		//}
-		//
-		//schemaRefs[api.RspType.Elem().PkgPath()+"/"+api.RspType.Elem().Name()] = &openApi.SchemaRef{
-		//	Properties: getParmas(api.RspType),
-		//	Type:       api.RspType.Name(),
-		//	Required:   []string{},
-		//}
 	}
 
 	f(schemas, apiSet.Put)

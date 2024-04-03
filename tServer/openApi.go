@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -35,6 +36,7 @@ const (
 	TypeBoolean = `boolean`
 	TypeArray   = `array`
 	TypeString  = `string`
+	TypeByte    = `byte`
 	TypeFile    = `file`
 	TypeObject  = `object`
 
@@ -104,13 +106,17 @@ func getOpts(methodApi *Api) *openApi.Operation {
 					},
 				})
 			} else {
+				swaggerType, swaggerFomat := goType2SwaggerTypeAndFormat(parma.Type.String())
 				arrApiParam = append(arrApiParam, openApi.Parameter{
 					Name:        parma.Name,
 					In:          InType,
 					Description: parma.Tag.Get("desc"),
 					Required:    required,
 					Schema: &openApi.SchemaRef{
-						Type: parma.Type.Name(),
+						Type: swaggerType,
+						Items: openApi.Item{
+							Type: swaggerFomat,
+						},
 					},
 				})
 			}
@@ -147,6 +153,7 @@ func getOpts(methodApi *Api) *openApi.Operation {
 }
 
 func goType2SwaggerTypeAndFormat(typeName string) (swaggerType, swaggerFormat string) {
+	// 基础数据类型
 	switch typeName {
 	case "int", "int32":
 		return TypeInteger, FormatInt32
@@ -159,10 +166,36 @@ func goType2SwaggerTypeAndFormat(typeName string) (swaggerType, swaggerFormat st
 	case "string":
 		return TypeString,""
 	case "uint8":
-		return TypeString, FormatByte
+		return TypeByte, ""
 	case "bool":
 		return TypeBoolean, ""
 	}
 
+	// 数组数据类型
+	if tp, fmt, ok := getSwaggerArrTypeAndFormat(typeName); ok{
+		return tp, fmt
+	}
+
 	panic(fmt.Sprintf("<In goType2SwaggerTypeAndFormat> ErrorType:[%s]", typeName))
+}
+
+func getSwaggerArrTypeAndFormat(typeName string) (swaggerType, swaggerFormat string, ok bool) {
+	// 数组类型
+	// Count the number of "[]" in the string
+	count := strings.Count(typeName, "[]")
+
+	// Remove all "[]" from the string to get the type
+	t := strings.Replace(typeName, "[]", "", -1)
+
+	swaggerTypeName, _ := goType2SwaggerTypeAndFormat(t)
+
+	if count >= 1 {
+		// 定义正则表达式，匹配最后一个类型名称
+		re := regexp.MustCompile(`\[\](\w+)$`)
+
+		// 使用正则表达式替换最后一个类型名称
+		return TypeArray, re.ReplaceAllString(typeName, swaggerTypeName), true
+	}
+
+	return "", "", false
 }

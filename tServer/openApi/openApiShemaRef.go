@@ -6,10 +6,12 @@ type SchemaRef struct {
 	Properties any      `json:"properties,omitempty"`
 	Type       string   `json:"type,omitempty"`
 	Required   []string `json:"required,omitempty"`
-	//
-	//Type string `json:"type"`
-	Ref string `json:"$ref,omitempty"`
-	//Value *Schema `json:"Value,omitempty"`
+	Items      Item     `json:"items,omitempty"`
+	Ref        string   `json:"$ref,omitempty"`
+}
+
+type Item struct {
+	Type string `json:"type,omitempty"`
 }
 
 type Propertie struct {
