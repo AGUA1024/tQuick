@@ -1,19 +1,12 @@
 package tServer
 
 import (
-	"embed"
 	"fmt"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"reflect"
 	"regexp"
 	"strings"
 )
-
-//go:embed kenife4j/doc.html
-var docHtmlFiles embed.FS
-
-//go:embed kenife4j/webjars/*
-var webjarsFiles embed.FS
 
 // OpenApiV3 is the structure defined from:
 // https://swagger.io/specification/
@@ -63,6 +56,11 @@ func getOpts(methodApi *Api) *openApi.Operation {
 		return nil
 	}
 
+	reqBody := &openApi.RequestBody{
+		Description: "",
+		Required:    true,
+	}
+
 	arrApiParam := []openApi.Parameter{}
 	for _, reqType := range methodApi.arrReqType {
 		// 指针类型兼容
@@ -82,62 +80,46 @@ func getOpts(methodApi *Api) *openApi.Operation {
 
 		InType := arrRetValue[0].String()
 
-		for i := 0; i < reqType.NumField(); i++ {
-			parma := reqType.Field(i)
-			required := true
-			// 跳过匿名对象，即跳过继承类的判断
-			if parma.Anonymous {
-				continue
+		if InType == ParameterInBody {
+			refPath := strings.Replace(reqType.PkgPath()+"/"+reqType.Name(), "/", ".", -1)
+			reqBody.Content = map[string]openApi.MediaType{
+				"application/json": {
+					Schema: &openApi.SchemaRef{
+						Ref: "#/components/schemas/" + refPath,
+					},
+				},
 			}
 
-			// 如果是可选项则跳过判断
-			if strings.ToLower(parma.Tag.Get("required")) == "false" {
-				required = false
-			}
+			continue
+		}
 
-			if parma.Type.Kind() == reflect.Struct {
-				arrApiParam = append(arrApiParam, openApi.Parameter{
-					Name:        parma.Name,
-					In:          InType,
-					Description: "Parameter.Description",
-					Required:    required,
-					Schema: &openApi.SchemaRef{
-						Ref: "#/components/schemas/" + parma.Type.PkgPath() + "/" + parma.Type.Name(),
-					},
-				})
-			} else {
-				swaggerType, swaggerFomat := goType2SwaggerTypeAndFormat(parma.Type.String())
-				arrApiParam = append(arrApiParam, openApi.Parameter{
-					Name:        parma.Name,
-					In:          InType,
-					Description: parma.Tag.Get("desc"),
-					Required:    required,
-					Schema: &openApi.SchemaRef{
-						Type: swaggerType,
-						Items: openApi.Item{
-							Type: swaggerFomat,
-						},
-					},
-				})
-			}
+		if reqType.Kind() == reflect.Struct {
+			arrApiParam = append(arrApiParam, openApi.Parameter{
+				Name:        reqType.Name(),
+				In:          InType,
+				Description: "Parameter.Description",
+				Required:    true,
+				Schema:      &openApi.SchemaRef{},
+			})
 		}
 	}
 
+	refPath := strings.Replace(methodApi.RspType.Elem().PkgPath()+"/"+methodApi.RspType.Elem().Name(), "/", ".", -1)
 	return &openApi.Operation{
 		Tags:        []string{methodApi.GetGroup()},
 		Summary:     methodApi.GetAct(),
 		Description: "Get.Description",
 		OperationID: "",
 		Parameters:  arrApiParam,
-		RequestBody: nil,
+		RequestBody: reqBody,
 		Responses: map[string]*openApi.Response{
 			"200": {
 				Description: "",
 				Headers:     nil,
 				Content: map[string]openApi.MediaType{
-					"text/xml": {
+					"application/json": {
 						Schema: &openApi.SchemaRef{
-							Ref: "#/components/schemas/" + methodApi.RspType.Elem().PkgPath() + "/" + methodApi.RspType.Elem().Name(),
+							Ref: "#/components/schemas/" + refPath,
 						},
 					},
 				},
@@ -164,7 +146,7 @@ func goType2SwaggerTypeAndFormat(typeName string) (swaggerType, swaggerFormat st
 	case "float64":
 		return TypeNumber, FormatDouble
 	case "string":
-		return TypeString,""
+		return TypeString, ""
 	case "uint8":
 		return TypeByte, ""
 	case "bool":
@@ -172,8 +154,8 @@ func goType2SwaggerTypeAndFormat(typeName string) (swaggerType, swaggerFormat st
 	}
 
 	// 数组数据类型
-	if tp, fmt, ok := getSwaggerArrTypeAndFormat(typeName); ok{
-		return tp, fmt
+	if tp, format, ok := getSwaggerArrTypeAndFormat(typeName); ok {
+		return tp, format
 	}
 
 	panic(fmt.Sprintf("<In goType2SwaggerTypeAndFormat> ErrorType:[%s]", typeName))
@@ -187,9 +169,8 @@ func getSwaggerArrTypeAndFormat(typeName string) (swaggerType, swaggerFormat str
 	// Remove all "[]" from the string to get the type
 	t := strings.Replace(typeName, "[]", "", -1)
 
-	swaggerTypeName, _ := goType2SwaggerTypeAndFormat(t)
-
 	if count >= 1 {
+		swaggerTypeName, _ := goType2SwaggerTypeAndFormat(t)
 		// 定义正则表达式，匹配最后一个类型名称
 		re := regexp.MustCompile(`\[\](\w+)$`)
 
@@ -198,4 +179,34 @@ func getSwaggerArrTypeAndFormat(typeName string) (swaggerType, swaggerFormat str
 	}
 
 	return "", "", false
+}
+
+func getItems(tp reflect.Type, stack int) *openApi.Item {
+	switch tp.Kind() {
+	case reflect.Pointer:
+		tp = tp.Elem()
+
+	case reflect.Slice:
+		tp = tp.Elem()
+		stack++
+	}
+
+	switch tp.Kind() {
+	case reflect.Struct:
+		refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
+		return &openApi.Item{
+			Ref: "#/components/schemas/" + refPath,
+		}
+	case reflect.Slice:
+		return &openApi.Item{
+			Items: getItems(tp, stack),
+			Type:  TypeArray,
+		}
+	}
+
+	swgType, swgFormat := goType2SwaggerTypeAndFormat(tp.Name())
+	return &openApi.Item{
+		Type:   swgType,
+		Format: swgFormat,
+	}
 }

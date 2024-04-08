@@ -254,37 +254,50 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 			return
 		}
 
-		typeStack := []reflect.Type{}
+		tpStack := []reflect.Type{}
+		// 请求参数
 		for _, v := range api.arrReqType {
 			// 指针类型兼容
 			if v.Kind() == reflect.Pointer {
 				v = v.Elem()
 			}
 
-			for i := 0; i < v.NumField(); i++ {
-				// 跳过匿名字段，目的是跳过继承来的对象
-				if v.Field(i).Anonymous == true {
-					continue
-				}
-				typeStack = append(typeStack, v.Field(i).Type)
-			}
+			tpStack = append(tpStack, v)
 		}
 
-		typeStack = append(typeStack, api.RspType)
+		tpStack = append(tpStack, api.RspType)
 
-		for len(typeStack) > 0 {
-			tp := typeStack[0]
-			typeStack = typeStack[1:]
+		for len(tpStack) > 0 {
+			tp := tpStack[0]
+			tpStack = tpStack[1:]
 
-			// 兼容指针类型，若是指针类型则将tp的值设置为指针所指的地址的值
+			// 兼容指针类型和数组类型，若是指针类型则将tp的值设置为指针所指的地址的值
 			if tp.Kind() == reflect.Pointer {
 				tp = tp.Elem()
 			}
 
-			if tp.Kind() == reflect.Struct {
+			switch tp.Kind() {
+			case reflect.Struct:
+				refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
+
 				ref, arrTypeNode := getSchemaRef(tp)
-				typeStack = append(typeStack, arrTypeNode...)
-				schemaRefs[tp.PkgPath()+"/"+tp.Name()] = ref
+				tpStack = append(tpStack, arrTypeNode...)
+				schemaRefs[refPath] = ref
+			case reflect.Slice:
+				for tp.Kind() == reflect.Slice {
+					tp = tp.Elem()
+				}
+
+				// 过滤基础数据类型
+				if tp.Kind() != reflect.Struct {
+					continue
+				}
+
+				refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
+
+				ref, arrTypeNode := getSchemaRef(tp)
+				tpStack = append(tpStack, arrTypeNode...)
+				schemaRefs[refPath] = ref
 			}
 		}
 	}
@@ -320,26 +333,36 @@ func getSchemaRef(tp reflect.Type) (*openApi.SchemaRef, []reflect.Type) {
 			arrRequired = append(arrRequired, field.Name)
 		}
 
+		fiedType := field.Type
 		// 结构体类型递归判断
-		if field.Type.Kind() == reflect.Struct {
+		if fiedType.Kind() == reflect.Struct {
+			refPath := strings.Replace(field.Type.PkgPath()+"/"+field.Type.Name(), "/", ".", -1)
 			properties[field.Name] = openApi.Propertie{
 				Description: field.Tag.Get("desc"),
-				Ref:         "#/components/schemas/" + field.Type.PkgPath() + "/" + field.Type.Name(),
+				Ref:         "#/components/schemas/" + refPath,
 			}
-			arrParamType = append(arrParamType, field.Type)
+			arrParamType = append(arrParamType, fiedType)
+		} else if fiedType.Kind() == reflect.Slice {
+			propertie := openApi.Propertie{
+				Type:  TypeArray,
+				Items: getItems(fiedType, 0),
+			}
+
+			properties[field.Name] = propertie
+
+			arrParamType = append(arrParamType, fiedType)
 		} else { // 常规类型
-			swgType,swgFormat := goType2SwaggerTypeAndFormat(field.Type.Name())
+			swgType, _ := goType2SwaggerTypeAndFormat(fiedType.Name())
 			properties[field.Name] = openApi.Propertie{
 				Description: field.Tag.Get("desc"),
 				Type:        swgType,
-				Format:      swgFormat,
 			}
 		}
 	}
 
 	return &openApi.SchemaRef{
 		Properties: properties,
-		Type:       tp.Name(),
+		Type:       TypeObject,
 		Required:   arrRequired,
 	}, arrParamType
 }
