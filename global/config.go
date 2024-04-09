@@ -9,6 +9,7 @@ var globalConfig = tQucikConf{}
 
 type tQucikConf struct {
 	Server *Server             `yaml:"server"`
+	ApiDoc *ApiDoc             `yaml:"apiDoc"`
 	Log    *Log                `yaml:"log"`
 	Db     map[string][]DbInfo `yaml:"db"`
 	Cache  *Cache              `yaml:"cache"`
@@ -19,7 +20,17 @@ type Server struct {
 	Version string `yaml:"version"`
 	Env     string `yaml:"env"`
 	Port    int    `yaml:"port"`
-	ApiDoc  string `yaml:"apidoc"`
+}
+
+type ApiDoc struct {
+	SwaggerPath string    `json:"swaggerPath"`
+	ApiFox      ApiFoxDoc `json:"apiFox"`
+}
+
+type ApiFoxDoc struct {
+	Enable    bool   `json:"enable"`
+	ProjectId string `json:"projectId"`
+	Token     string `json:"token"`
 }
 
 type DbInfo struct {

@@ -3,7 +3,13 @@ server:                                    # 服务端配置
   version: 0.0.1                           # 应用程序版本号
   env: Development                         # 环境类型，分正式Production和非正式Development两种类型
   port: 8000                               # 服务监听端口
-  apidoc: /tQuick/doc.html                 # 接口文档地址[配置时保留末级地址，如配置"/tQuick/doc.html",则需避免"/tQuick/"后面的路径使用]
+
+apiDoc:
+  swaggerPath: /tQuick                     # 接口文档地址前缀，访问地址为'{apidoc}/swagger/index.html'[配置时保留末级地址，如配置"/tQuick",则需避免"/tQuick/*any"路径使用]
+  apifox:
+    enable: false                          # apifox集成启动开关，bool值
+    projectId: xxx                         # 项目id
+    token: APS-xxx                         # 身份令牌,建议申请长期令牌
 
 log:                                       # 日志配置
   logPath: ./log                           # 日志文件输出路径

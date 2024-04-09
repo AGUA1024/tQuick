@@ -139,7 +139,9 @@ func (s *Server) ApiDocInit() {
 	c := s.g
 	appName := global.GetGlobalConfig().Server.App
 	version := global.GetGlobalConfig().Server.Version
-	apiDoc := global.GetGlobalConfig().Server.ApiDoc
+	port := global.GetGlobalConfig().Server.Port
+	swaggerPath := global.GetGlobalConfig().ApiDoc.SwaggerPath
+	apiFox := global.GetGlobalConfig().ApiDoc.ApiFox
 
 	routPaths := map[string]openApi.Path{}
 	components := map[string]*openApi.SchemaRef{}
@@ -207,5 +209,17 @@ func (s *Server) ApiDocInit() {
 
 	// 设置Swagger路由
 	url := ginSwagger.URL("/swagger/openApi.json") // 指向API定义
-	c.GET(fmt.Sprintf("%s/*any", apiDoc), ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+	c.GET(fmt.Sprintf("%s/*any", swaggerPath), ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+
+	fmt.Println(fmt.Sprintf("Swagger documentation initialization is complete, please visit http://0.0.0.0:%d%s/swagger/index.html to check it", port, swaggerPath))
+
+	// apifox
+	if apiFox.Enable {
+		success, err := importApi2ApiFox(apiFox.ProjectId, openApiV3Str, apiFox.Token)
+		if success {
+			fmt.Println(fmt.Sprintf("The ApiFox documentation has been updated synchronously. Please visit https://apifox.com/apidoc/project-%s  to check it", apiFox.ProjectId))
+		} else {
+			fmt.Println(fmt.Sprintf("ApiFox document synchronization update failed: %v", err))
+		}
+	}
 }
