@@ -112,6 +112,8 @@ func RouteGroupRegister(routeGroup tIRoute.IController, middlewares ...gin.Handl
 func (s Server) RouteRegister(RouteGroupMiddlewaresMap map[string][]tIRoute.IController) {
 	for routeGroup, arrCtrl := range RouteGroupMiddlewaresMap {
 		for _, ctrl := range arrCtrl {
+			// ctrl复制同名局部变量，以防止影响闭包函数的入参
+			ctrl := ctrl
 			st := reflect.TypeOf(ctrl)
 
 			var field reflect.StructField
