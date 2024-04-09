@@ -3,6 +3,7 @@ package tServer
 import (
 	"fmt"
 	"github.com/AGUA1024/tQuick/tIRoute"
+	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -100,7 +101,9 @@ func RouteGroupRegister(routeGroup tIRoute.IController, middlewares ...gin.Handl
 	group := routeGroup.GetRouteGroup()
 
 	if group == "" {
-		panic("<In RouteGroupRegister> RouteGroup is missing group configuration")
+		errMsg := "<In RouteGroupRegister> RouteGroup is missing group configuration"
+		tLog.Error(errMsg)
+		panic(errMsg)
 	}
 
 	// 给路由组的路由全部注册上中间件
@@ -124,18 +127,24 @@ func (s Server) RouteRegister(RouteGroupMiddlewaresMap map[string][]tIRoute.ICon
 			}
 
 			if field.Tag.Get("route") == "" {
-				panic("<In RouteRegister> Controller is missing routing configuration")
+				errMsg := "<In RouteRegister> Controller is missing routing configuration"
+				tLog.Error(errMsg)
+				panic(errMsg)
 			}
 
 			if field.Tag.Get("method") == "" {
-				panic("<In RouteRegister> Controller is missing the configuration of the http method")
+				errMsg := "<In RouteRegister> Controller is missing the configuration of the http method"
+				tLog.Error(errMsg)
+				panic(errMsg)
 			}
 
 			arrReqType := []reflect.Type{}
 
 			handleFunc, ok := st.MethodByName("Handle")
 			if !ok {
-				panic("<In RouteRegister> The api lacks a handle function")
+				errMsg := "<In RouteRegister> The api lacks a handle function"
+				tLog.Error(errMsg)
+				panic(errMsg)
 			}
 
 			for i := 1; i < handleFunc.Type.NumIn(); i++ {
@@ -174,7 +183,9 @@ func (s Server) RouteRegister(RouteGroupMiddlewaresMap map[string][]tIRoute.ICon
 
 					decodeFunc, ok := reqType.MethodByName("ReqDecode")
 					if !ok {
-						panic("<In RouteRegister> request obj error!")
+						errMsg := "<In RouteRegister> request obj error!"
+						tLog.Error(errMsg)
+						panic(errMsg)
 						return
 					}
 

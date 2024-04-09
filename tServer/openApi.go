@@ -2,6 +2,7 @@ package tServer
 
 import (
 	"fmt"
+	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"reflect"
 	"regexp"
@@ -71,7 +72,9 @@ func getOpts(methodApi *Api) *openApi.Operation {
 		// 方法是指针类型的方法
 		getHttpTypeFunc, ok := reflect.PointerTo(reqType).MethodByName("GetHttpParmaType")
 		if !ok {
-			panic("<In getOpts> GetHttpParmaType Error")
+			errMsg := fmt.Errorf("<In getOpts> GetHttpParmaType Error")
+			tLog.Error(errMsg)
+			panic(errMsg)
 		}
 
 		arrRetValue := getHttpTypeFunc.Func.Call(
@@ -158,7 +161,9 @@ func goType2SwaggerTypeAndFormat(typeName string) (swaggerType, swaggerFormat st
 		return tp, format
 	}
 
-	panic(fmt.Sprintf("<In goType2SwaggerTypeAndFormat> ErrorType:[%s]", typeName))
+	errMsg := fmt.Sprintf("<In goType2SwaggerTypeAndFormat> ErrorType:[%s]", typeName)
+	tLog.Error(errMsg)
+	panic(errMsg)
 }
 
 func getSwaggerArrTypeAndFormat(typeName string) (swaggerType, swaggerFormat string, ok bool) {

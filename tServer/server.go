@@ -69,7 +69,9 @@ func (s *Server) Run() {
 
 	err := endless.ListenAndServe(fmt.Sprintf(":%d", s.port), s.g)
 	if err != nil {
-		panic(fmt.Sprintf("<In Run> %v", err))
+		errMsg := fmt.Sprintf("<In Run> %v", err)
+		tLog.Error(errMsg)
+		panic(errMsg)
 	}
 }
 
@@ -82,7 +84,9 @@ func (s *Server) ApiRegister(api *Api) {
 
 	f := func(a *Api) *Api {
 		if isSet && a != nil {
-			panic(fmt.Sprintf("The api is repeatedly defined. [%s]:%s", api.Method, api.ReqPath))
+			errMsg := fmt.Sprintf("The api is repeatedly defined. [%s]:%s", api.Method, api.ReqPath)
+			tLog.Error(errMsg)
+			panic(errMsg)
 		}
 
 		return api
@@ -110,7 +114,9 @@ func (s *Server) ApiRegister(api *Api) {
 	case "ANY":
 		s.Api[api.ReqPath].Any = f(s.Api[api.ReqPath].Any)
 	default:
-		panic("<In ApiRegister> error Method")
+		errMsg := "<In ApiRegister> error Method"
+		tLog.Error(errMsg)
+		panic(errMsg)
 	}
 }
 
