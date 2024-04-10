@@ -240,22 +240,24 @@ func isParamMissed(jsonInstance reflect.Value) bool {
 			continue
 		}
 
-		// 如果是可选项则跳过判断
-		if strings.ToLower(fieldType.Tag.Get("required")) == "false" || fieldType.Anonymous {
+		// 可选项则跳过判断
+		if strings.ToLower(fieldType.Tag.Get("required")) == "false" {
 			continue
 		}
 
 		// 结构体类型递归判断
 		if fieldValue.Type().Kind() == reflect.Struct {
 			if isParamMissed(fieldValue) {
+				errMsg := fmt.Sprintf("<In isParamMissed> ParamMissed: %v", fieldType.Name)
+				tLog.Error(errMsg)
 				return true
 			}
 		}
 
-		// 基础数据类型直接判断
-		if fieldValue.IsZero() {
-			return true
-		}
+		// 基础数据类型不作判断，防止0值冲突
+		//if fieldValue.IsZero() {
+		//	return true
+		//}
 	}
 
 	return false

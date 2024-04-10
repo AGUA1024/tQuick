@@ -225,7 +225,7 @@ func (s *Server) ApiDocInit() {
 		if success {
 			fmt.Println(fmt.Sprintf("The ApiFox documentation has been updated synchronously. Please visit https://apifox.com/apidoc/project-%s  to check it", apiFox.ProjectId))
 		} else {
-			fmt.Println(fmt.Sprintf("ApiFox document synchronization update failed: %v", err))
+			tLog.Warnf("ApiFox document synchronization update failed: %v", err)
 		}
 	}
 }
