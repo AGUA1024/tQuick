@@ -197,7 +197,12 @@ func (s Server) RouteRegister(RouteGroupMiddlewaresMap map[string][]tIRoute.ICon
 					err, ok := arrRetValue[1].Interface().(error)
 
 					if ok && err != nil {
-						c.JSON(http.StatusBadRequest, err.Error())
+						c.JSON(http.StatusBadRequest,
+							gin.H{
+								"Code": http.StatusBadRequest,
+								"Msg":  err.Error(),
+							},
+						)
 						return
 					}
 
