@@ -57,7 +57,7 @@ func (j *HttpUri) GetHttpParmaType() string {
 func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 	reqBodyJson, _ := c.GetRawData()
 
-	if ok, err := isJsonParamMissed(reqBodyJson, reqType); !ok {
+	if isMissed, err := isJsonParamMissed(reqBodyJson, reqType); isMissed {
 		errMsg := "<In HttpJsonBody.ReqDecode> Invalid Json Request: ParamMissed"
 		tLog.Errorf("%s: %v", errMsg, err)
 		return nil, errors.New(errMsg)
@@ -88,7 +88,7 @@ func (j *HttpHeader) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error
 		return nil, errors.New(errMsg)
 	}
 
-	if ok, err := isJsonParamMissed(buf, reqType); !ok {
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
 		errMsg := "<In HttpHeader.ReqDecode> Invalid Http Request: ParamMissed"
 		tLog.Errorf("%s: %v", errMsg, err)
 		return nil, errors.New(errMsg)
@@ -113,7 +113,7 @@ func (j *HttpQuery) ReqDecode(c *gin.Context, reqType reflect.Type) (interface{}
 		return nil, errors.New(errMsg)
 	}
 
-	if ok, err := isJsonParamMissed(buf, reqType); !ok {
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
 		errMsg := "<In HttpQuery.ReqDecode> Invalid Http QueryParma: ParamMissed"
 		tLog.Errorf("%s: %v", errMsg, err)
 		return nil, errors.New(errMsg)
@@ -139,7 +139,7 @@ func (j *HttpFormData) ReqDecode(c *gin.Context, reqType reflect.Type) (any, err
 		return nil, errors.New(errMsg)
 	}
 
-	if ok, err := isJsonParamMissed(buf, reqType); !ok {
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
 		errMsg := "<In HttpFormData.ReqDecode> Invalid Http FormData: ParamMissed"
 		tLog.Errorf("%s: %v", errMsg, err)
 		return nil, errors.New(errMsg)
@@ -165,7 +165,7 @@ func (j *HttpUri) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 		return nil, errors.New(errMsg)
 	}
 
-	if ok, err := isJsonParamMissed(buf, reqType); !ok {
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
 		errMsg := "<In HttpUri.ReqDecode> Invalid Http Uri: ParamMissed"
 		tLog.Errorf("%s: %v", errMsg, err)
 		return nil, errors.New(errMsg)
