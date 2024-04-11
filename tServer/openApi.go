@@ -83,6 +83,7 @@ func getOpts(methodApi *Api) *openApi.Operation {
 
 		InType := arrRetValue[0].String()
 
+		// body
 		if InType == ParameterInBody {
 			refPath := strings.Replace(reqType.PkgPath()+"/"+reqType.Name(), "/", ".", -1)
 			reqBody.Content = map[string]openApi.MediaType{
@@ -96,14 +97,36 @@ func getOpts(methodApi *Api) *openApi.Operation {
 			continue
 		}
 
+		// Parameters
 		if reqType.Kind() == reflect.Struct {
-			arrApiParam = append(arrApiParam, openApi.Parameter{
-				Name:        reqType.Name(),
-				In:          InType,
-				Description: "Parameter.Description",
-				Required:    true,
-				Schema:      &openApi.SchemaRef{},
-			})
+			for i := 0; i < reqType.NumField(); i++ {
+				field := reqType.Field(i)
+
+				isRequired := true
+				// 跳过匿名对象，即跳过继承类的判断
+				if field.Anonymous {
+					continue
+				}
+
+				// Parameters数据值支持基础数据类型，如整型、浮点型、布尔型、字符串
+				switch field.Type.Kind() {
+				case reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
+					panic("Parameters supports only basic data types: numbers, floating-point numbers, strings, Booleans")
+				}
+
+				if strings.ToLower(field.Tag.Get("required")) == "false" {
+					isRequired = false
+				}
+
+				arrApiParam = append(arrApiParam, openApi.Parameter{
+					Name:        field.Name,
+					In:          InType,
+					Description: "Parameter.Description",
+					Required:    isRequired,
+					Schema:      &openApi.SchemaRef{},
+				})
+			}
+
 		}
 	}
 

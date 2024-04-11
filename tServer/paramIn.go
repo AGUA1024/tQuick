@@ -1,12 +1,15 @@
 package tServer
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/schema"
 	"reflect"
+	"strconv"
+	"unsafe"
 )
 
 const (
@@ -55,110 +58,213 @@ func (j *HttpUri) GetHttpParmaType() string {
 func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
 	reqBodyJson, _ := c.GetRawData()
 
-	param := reflect.New(reqType.Elem()).Interface()
-
-	// 解析JSON数据到参数实例
-	err := json.Unmarshal(reqBodyJson, param)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("<In HttpJsonBody.ReqDecode> Invalid Json Request:%v", err))
+	if isMissed, err := isJsonParamMissed(reqBodyJson, reqType); isMissed {
+		errMsg := "<In HttpJsonBody.ReqDecode> Invalid Json Request: ParamMissed"
+		tLog.Errorf("%s: %v", errMsg, err)
+		return nil, errors.New(errMsg)
 	}
 
-	indirectParam := reflect.Indirect(reflect.ValueOf(param))
-	if isParamMissed(indirectParam) {
-		return nil, errors.New("<In HttpJsonBody.ReqDecode> Invalid Http Request: ParamMissed")
-	}
+	jsonData := map[string]any{}
 
-	return param, nil
-}
+	decoder := json.NewDecoder(bytes.NewReader(reqBodyJson))
+	decoder.UseNumber()
+	decoder.Decode(&jsonData)
 
-func (j *HttpHeader) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
-	param := reflect.New(reqType.Elem()).Interface()
-	err := c.BindHeader(param)
-	if err != nil {
-		return nil, errors.New("<In HttpHeader.ReqDecode> Invalid Http Header:" + err.Error())
-	}
+	// json区分整型和浮点型
+	for k, v := range jsonData {
+		if number, ok := v.(json.Number); ok {
+			if vv, err := number.Int64(); err == nil {
+				jsonData[k] = vv
+				continue
+			}
 
-	indirectParam := reflect.Indirect(reflect.ValueOf(param))
-	if isParamMissed(indirectParam) {
-		return nil, errors.New("<In HttpHeader.ReqDecode> Invalid Http Request: Http Header Missed")
-	}
-	return param, nil
-}
-
-func (j *HttpQuery) ReqDecode(c *gin.Context, reqType reflect.Type) (interface{}, error) {
-	param := reflect.New(reqType.Elem()).Interface()
-
-	decoder := schema.NewDecoder()
-	decoder.IgnoreUnknownKeys(true) // 忽略未知键
-	decoder.ZeroEmpty(true)         // 将空字符串解码为零值
-
-	err := decoder.Decode(param, c.Request.URL.Query())
-	if err != nil {
-		return nil, errors.New("<In HttpQuery.ReqDecode> Invalid Http Query:" + err.Error())
-	}
-
-	indirectParam := reflect.Indirect(reflect.ValueOf(param))
-	if isParamMissed(indirectParam) {
-		return nil, errors.New("<In HttpQuery.ReqDecode> Invalid Http Request: Http QueryParma Missed")
-	}
-	return param, nil
-}
-
-func (j *HttpFormData) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
-	param := reflect.New(reqType.Elem()).Interface()
-
-	dictFormData, _ := c.MultipartForm()
-
-	// 预处理，兼容数组类型
-	preprocessedData := make(map[string][]string)
-	for key, values := range dictFormData.Value {
-		for _, value := range values {
-			var arr []string
-			if err := json.Unmarshal([]byte(value), &arr); err == nil {
-				preprocessedData[key] = append(preprocessedData[key], arr...)
-			} else {
-				preprocessedData[key] = append(preprocessedData[key], value)
+			if vv, err := number.Float64(); err == nil {
+				jsonData[k] = vv
 			}
 		}
 	}
 
-	decoder := schema.NewDecoder()
-	decoder.IgnoreUnknownKeys(true) // 忽略未知键
-	decoder.ZeroEmpty(true)         // 将空字符串解码为零值
+	return unsafeUnmarshalParam(jsonData, reqType), nil
+}
 
-	err := decoder.Decode(param, preprocessedData)
+func (j *HttpHeader) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	dictHeader := map[string]string{}
+	for k, v := range c.Request.Header {
+		dictHeader[k] = v[0]
+	}
+	dictStingAuto := mapValueTypeAuto(dictHeader)
+	ret := unsafeUnmarshalParam(dictStingAuto, reqType)
+
+	buf, err := json.Marshal(dictStingAuto)
 	if err != nil {
-		return nil, errors.New("<In HttpFormData.ReqDecode> Invalid Http FormData:" + err.Error())
+		errMsg := fmt.Sprintf("<In HttpHeader.ReqDecode> Invalid Http Header Request: %v", err)
+		tLog.Errorf(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
-	indirectParam := reflect.Indirect(reflect.ValueOf(param))
-	if isParamMissed(indirectParam) {
-		return nil, errors.New("<In HttpFormData.ReqDecode> Invalid Http Request: Http FormData Missed")
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
+		errMsg := "<In HttpHeader.ReqDecode> Invalid Http Request: ParamMissed"
+		tLog.Errorf("%s: %v", errMsg, err)
+		return nil, errors.New(errMsg)
 	}
-	return param, nil
+
+	return ret, nil
+}
+
+func (j *HttpQuery) ReqDecode(c *gin.Context, reqType reflect.Type) (interface{}, error) {
+	dictQuery := map[string]string{}
+	for k, v := range c.Request.URL.Query() {
+		dictQuery[k] = v[0]
+	}
+
+	dictStingAuto := mapValueTypeAuto(dictQuery)
+	ret := unsafeUnmarshalParam(dictStingAuto, reqType)
+
+	buf, err := json.Marshal(dictStingAuto)
+	if err != nil {
+		errMsg := fmt.Sprintf("<In HttpQuery.ReqDecode> Invalid Http Query : %v", err)
+		tLog.Errorf(errMsg)
+		return nil, errors.New(errMsg)
+	}
+
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
+		errMsg := "<In HttpQuery.ReqDecode> Invalid Http QueryParma: ParamMissed"
+		tLog.Errorf("%s: %v", errMsg, err)
+		return nil, errors.New(errMsg)
+	}
+
+	return ret, nil
+}
+
+func (j *HttpFormData) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	dictFormData, _ := c.MultipartForm()
+	preprocessedData := make(map[string]string)
+	for key, values := range dictFormData.Value {
+		preprocessedData[key] = values[0]
+	}
+
+	dictStingAuto := mapValueTypeAuto(preprocessedData)
+	ret := unsafeUnmarshalParam(dictStingAuto, reqType)
+
+	buf, err := json.Marshal(dictStingAuto)
+	if err != nil {
+		errMsg := fmt.Sprintf("<In HttpFormData.ReqDecode> Invalid Http FormData: %v", err)
+		tLog.Errorf(errMsg)
+		return nil, errors.New(errMsg)
+	}
+
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
+		errMsg := "<In HttpFormData.ReqDecode> Invalid Http FormData: ParamMissed"
+		tLog.Errorf("%s: %v", errMsg, err)
+		return nil, errors.New(errMsg)
+	}
+
+	return ret, nil
 }
 
 func (j *HttpUri) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
-	param := reflect.New(reqType.Elem()).Interface()
-
 	// 获取动态路由参数并解码
-	params := make(map[string][]string)
+	params := make(map[string]string)
 	for _, p := range c.Params {
-		params[p.Key] = []string{p.Value}
+		params[p.Key] = p.Value
 	}
 
-	decoder := schema.NewDecoder()
-	decoder.IgnoreUnknownKeys(true) // 忽略未知键
-	decoder.ZeroEmpty(true)         // 将空字符串解码为零值
+	dictStingAuto := mapValueTypeAuto(params)
+	ret := unsafeUnmarshalParam(dictStingAuto, reqType)
 
-	err := decoder.Decode(param, params)
+	buf, err := json.Marshal(dictStingAuto)
 	if err != nil {
-		return nil, errors.New("<In HttpUri.ReqDecode> Invalid Http Uri:" + err.Error())
+		errMsg := fmt.Sprintf("<In HttpUri.ReqDecode> Invalid Http Uri: %v", err)
+		tLog.Errorf(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
-	indirectParam := reflect.Indirect(reflect.ValueOf(param))
-	if isParamMissed(indirectParam) {
-		return nil, errors.New("<In HttpUri.ReqDecode> Invalid Http Request: Http UriParma Missed")
+	if isMissed, err := isJsonParamMissed(buf, reqType); isMissed {
+		errMsg := "<In HttpUri.ReqDecode> Invalid Http Uri: ParamMissed"
+		tLog.Errorf("%s: %v", errMsg, err)
+		return nil, errors.New(errMsg)
 	}
-	return param, nil
+
+	return ret, nil
+}
+
+func mapValueTypeAuto(input map[string]string) map[string]interface{} {
+	result := make(map[string]interface{})
+	for key, value := range input {
+		// 尝试转换为布尔型
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			result[key] = boolVal
+			continue
+		}
+
+		// 尝试转换为整型
+		if intVal, err := strconv.Atoi(value); err == nil {
+			result[key] = intVal
+			continue
+		}
+
+		// 尝试转换为浮点型
+		if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+			result[key] = floatVal
+			continue
+		}
+		// 如果都不是，则保留原来的字符串
+		result[key] = value
+	}
+	return result
+}
+
+func unsafeUnmarshalParam(jsonData map[string]any, tp reflect.Type) any {
+	paramPtr := reflect.New(tp.Elem())
+	for i := 0; i < paramPtr.Elem().NumField(); i++ {
+		field := paramPtr.Elem().Field(i)
+		fieldName := tp.Elem().Field(i).Name
+
+		fieldValue, _ := jsonData[fieldName]
+
+		if fieldValue != nil {
+			setValue(field, fieldValue)
+		}
+	}
+
+	return paramPtr.Interface()
+}
+
+func setValue(field reflect.Value, value interface{}) {
+	fieldType := field.Type()
+	switch fieldType.Kind() {
+	case reflect.Struct:
+		if reflect.ValueOf(value).Type().Kind() == reflect.Map {
+			// 针对结构体的字段进行递归赋值
+			for i := 0; i < field.NumField(); i++ {
+				subField := field.Field(i)
+				if !subField.CanSet() {
+					subFieldValue := reflect.ValueOf(value).MapIndex(reflect.ValueOf(fieldType.Field(i).Name))
+					setValue(subField, subFieldValue.Interface())
+				}
+			}
+		}
+	case reflect.Slice:
+		sliceValue := reflect.MakeSlice(fieldType, 0, 0)
+		sliceData := value.([]interface{})
+		for _, elem := range sliceData {
+			elemVal := reflect.New(fieldType.Elem()).Elem()
+			setValue(elemVal, elem)
+			sliceValue = reflect.Append(sliceValue, elemVal)
+		}
+		field.Set(sliceValue)
+	case reflect.Array:
+		for i := 0; i < field.Len(); i++ {
+			setValue(field.Index(i), value.([]interface{})[i])
+		}
+	default:
+		if field.IsValid() && field.CanSet() {
+			field.Set(reflect.ValueOf(value))
+		} else {
+			pointerToField := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr()))
+			//pointerToField.Elem().Set(reflect.ValueOf(value))
+			// 此处使用强制类型转换，定义接收的数据类型时需要提前选择合适的类型
+			pointerToField.Elem().Set(reflect.ValueOf(value).Convert(pointerToField.Elem().Type()))
+		}
+	}
 }
