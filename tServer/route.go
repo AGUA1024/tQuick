@@ -1,11 +1,14 @@
 package tServer
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/AGUA1024/tQuick/tIRoute"
 	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/gin-gonic/gin"
+	"github.com/xeipuuv/gojsonschema"
 	"net/http"
 	"reflect"
 	"strings"
@@ -234,38 +237,107 @@ func (s Server) RouteRegister(RouteGroupMiddlewaresMap map[string][]tIRoute.ICon
 	}
 }
 
-// 判断request json对象必选参数是否缺失
-func isParamMissed(jsonInstance reflect.Value) bool {
-	for i := 0; i < jsonInstance.NumField(); i++ {
-		fieldValue := jsonInstance.Field(i)
-		fieldType := jsonInstance.Type().Field(i)
+func generateJSONSchemaData(t reflect.Type) string {
+	schema := schemaFromType(t)
+	jsonBytes, err := json.Marshal(schema)
+	if err != nil {
+		panic(err)
+	}
+	return string(jsonBytes)
+}
 
-		// 跳过匿名对象，即跳过继承类的判断
-		if fieldType.Anonymous {
-			continue
-		}
+func schemaFromType(t reflect.Type) interface{} {
+	switch t.Kind() {
+	case reflect.Struct:
+		properties := map[string]interface{}{}
+		required := []string{}
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
 
-		// 可选项则跳过判断
-		if strings.ToLower(fieldType.Tag.Get("required")) == "false" {
-			continue
-		}
+			// 跳过匿名对象，即跳过继承类的判断
+			if field.Anonymous {
+				continue
+			}
 
-		// 结构体类型递归判断
-		if fieldValue.Type().Kind() == reflect.Struct {
-			if isParamMissed(fieldValue) {
-				errMsg := fmt.Sprintf("<In isParamMissed> ParamMissed: %v", fieldType.Name)
-				tLog.Error(errMsg)
-				return true
+			fieldName := field.Name
+			if tagValue := field.Tag.Get("json"); tagValue != "" {
+				fieldName = strings.Split(tagValue, ",")[0]
+			}
+			properties[fieldName] = schemaFromType(field.Type)
+			if strings.ToLower(field.Tag.Get("required")) != "false" {
+				required = append(required, fieldName)
 			}
 		}
 
-		// 基础数据类型不作判断，防止0值冲突
-		//if fieldValue.IsZero() {
-		//	return true
-		//}
+		result := map[string]interface{}{
+			"type":       "object",
+			"properties": properties,
+		}
+		if len(required) > 0 {
+			result["required"] = required
+		}
+		return result
+	case reflect.Array, reflect.Slice:
+		elemType := schemaFromType(t.Elem())
+		return map[string]interface{}{
+			"type":  "array",
+			"items": elemType,
+		}
+	case reflect.String:
+		return map[string]interface{}{
+			"type": "string",
+		}
+	case reflect.Int, reflect.Int32, reflect.Int64:
+		return map[string]interface{}{
+			"type": "integer",
+		}
+	case reflect.Float32, reflect.Float64:
+		return map[string]interface{}{
+			"type": "number",
+		}
+	case reflect.Bool:
+		return map[string]interface{}{
+			"type": "boolean",
+		}
+	case reflect.Map:
+		keySchema := schemaFromType(t.Key())
+		elemSchema := schemaFromType(t.Elem())
+		return map[string]interface{}{
+			"type": "object",
+			"additionalProperties": map[string]interface{}{
+				"keys":   keySchema,
+				"values": elemSchema,
+			},
+		}
+	// ...处理其他需要支持的数据类型
+	default:
+		panic(fmt.Sprintf("Unsupported type: %v", t))
+	}
+}
+
+// 判断request json对象必选参数是否缺失
+func isJsonParamMissed(reqBuf []byte, reqType reflect.Type) (bool, error) {
+	reqTp := reqType
+	if reqTp.Kind() == reflect.Pointer {
+		reqTp = reqTp.Elem()
+	}
+	strLoader := generateJSONSchemaData(reqTp)
+	schemaLoader := gojsonschema.NewStringLoader(strLoader)
+	docLoader := gojsonschema.NewStringLoader(string(reqBuf))
+	result, err := gojsonschema.Validate(schemaLoader, docLoader)
+	if err != nil {
+		return true, err
 	}
 
-	return false
+	if result.Valid() {
+		return false, nil
+	} else {
+		errMsg := ""
+		for _, desc := range result.Errors() {
+			errMsg += fmt.Sprintf("- %s\n", desc)
+		}
+		return true, errors.New(errMsg)
+	}
 }
 
 func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
