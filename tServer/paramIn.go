@@ -1,6 +1,7 @@
 package tServer
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -64,10 +65,23 @@ func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, err
 	}
 
 	jsonData := map[string]any{}
-	if err := json.Unmarshal(reqBodyJson, &jsonData); err != nil {
-		errMsg := fmt.Sprintf("<In HttpJsonBody.ReqDecode> Invalid JSON Request: %v", err)
-		tLog.Error(errMsg)
-		return nil, errors.New(errMsg)
+
+	decoder := json.NewDecoder(bytes.NewReader(reqBodyJson))
+	decoder.UseNumber()
+	decoder.Decode(&jsonData)
+
+	// json区分整型和浮点型
+	for k, v := range jsonData {
+		if number, ok := v.(json.Number); ok {
+			if vv, err := number.Int64(); err == nil {
+				jsonData[k] = vv
+				continue
+			}
+
+			if vv, err := number.Float64(); err == nil {
+				jsonData[k] = vv
+			}
+		}
 	}
 
 	return unsafeUnmarshalParam(jsonData, reqType), nil
@@ -248,7 +262,9 @@ func setValue(field reflect.Value, value interface{}) {
 			field.Set(reflect.ValueOf(value))
 		} else {
 			pointerToField := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr()))
-			pointerToField.Elem().Set(reflect.ValueOf(value))
+			//pointerToField.Elem().Set(reflect.ValueOf(value))
+			// 此处使用强制类型转换，定义接收的数据类型时需要提前选择合适的类型
+			pointerToField.Elem().Set(reflect.ValueOf(value).Convert(pointerToField.Elem().Type()))
 		}
 	}
 }
