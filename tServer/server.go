@@ -10,37 +10,31 @@ import (
 	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
-	"github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
 	_ "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"net/http"
 	"regexp"
+	"sync"
 )
 
-var Serv tIServer.IServer = &Server{
-	g:   gin.Default(),
-	Api: map[string]*ApiSet{},
-	Db:  map[string]*gorm.DB{},
-}
+var Serv tIServer.IServer
+var once sync.Once
 
 func NewServer() tIServer.IServer {
-	Serv = &Server{
-		g:   gin.Default(),
-		Api: map[string]*ApiSet{},
-		Db:  map[string]*gorm.DB{},
-	}
+	once.Do(func() {
+		Serv = &Server{
+			g:   gin.Default(),
+			Api: map[string]*ApiSet{},
+			Db:  map[string]*gorm.DB{},
+		}
 
-	// 加载服务器配置
-	Serv.LoadConfig()
+		// 加载服务器配置
+		Serv.LoadConfig()
 
-	// 将Api注册到服务器中
-	Serv.RouteRegister(RouteGroupMiddlewaresMap)
+		// 将Api注册到服务器中
+		Serv.RouteRegister(RouteGroupMiddlewaresMap)
+	})
 
-	return Serv
-}
-
-func GetServer() tIServer.IServer {
 	return Serv
 }
 
