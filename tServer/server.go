@@ -1,13 +1,11 @@
 package tServer
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/AGUA1024/tQuick/global"
 	"github.com/AGUA1024/tQuick/tIServer"
 	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/AGUA1024/tQuick/tMiddleware"
-	"github.com/AGUA1024/tQuick/tServer/openApi"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
 	"github.com/swaggo/files"
@@ -15,7 +13,6 @@ import (
 	_ "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"net/http"
-	"regexp"
 	"sync"
 )
 
@@ -145,65 +142,7 @@ func (s *Server) ApiDocInit() {
 	swaggerPath := global.GetGlobalConfig().ApiDoc.SwaggerPath
 	apiFox := global.GetGlobalConfig().ApiDoc.ApiFox
 
-	routPaths := map[string]openApi.Path{}
-	components := map[string]*openApi.SchemaRef{}
-
-	for reqPath, v := range apiSet {
-		getComponents(components, v)
-
-		// 请求路径，文档参数兼容动态路由类型
-		re := regexp.MustCompile(`:(\w+)`)
-		newPath := re.ReplaceAllString(reqPath, "{$1}")
-
-		routPaths[newPath] = openApi.Path{
-			Ref:         "",
-			Summary:     "",
-			Description: "",
-			Connect:     getOpts(v.Connect),
-			Delete:      getOpts(v.Delete),
-			Get:         getOpts(v.Get),
-			Head:        getOpts(v.Head),
-			Options:     getOpts(v.Options),
-			Patch:       getOpts(v.Patch),
-			Post:        getOpts(v.Post),
-			Put:         getOpts(v.Put),
-			Trace:       getOpts(v.Trace),
-			Servers:     nil,
-			Parameters:  nil,
-		}
-	}
-
-	oai := &OpenApiV3{
-		Config:  openApi.Config{},
-		OpenAPI: "3.0.0",
-		Components: openApi.Components{
-			Schemas:         components,
-			Parameters:      nil,
-			Headers:         nil,
-			RequestBodies:   nil,
-			Responses:       nil,
-			SecuritySchemes: nil,
-			Examples:        nil,
-			Links:           nil,
-			Callbacks:       nil,
-		},
-		Info: openApi.Info{
-			Title:          appName,
-			Description:    "OpenApiV3.Info.Description",
-			TermsOfService: "OpenApiV3.Info.TermsOfService",
-			Contact:        nil,
-			License:        nil,
-			Version:        version,
-		},
-		Paths:        routPaths,
-		Security:     nil,
-		Servers:      nil,
-		Tags:         nil,
-		ExternalDocs: nil,
-	}
-
-	json, _ := json.Marshal(oai)
-	openApiV3Str := string(json)
+	openApiV3Str := GetOpenApiJson(apiSet, appName, version)
 
 	c.GET("/swagger/openApi.json", func(c *gin.Context) {
 		c.String(http.StatusOK, openApiV3Str)

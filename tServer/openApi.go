@@ -1,6 +1,7 @@
 package tServer
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
@@ -45,11 +46,83 @@ const (
 	FormatPassword = `password`
 )
 
+var inType2Tag = map[string]string{
+	ParameterInFormData: "form",
+	ParameterInHeader:   "header",
+	ParameterInQuery:    "query",
+	ParameterInPath:     "uri",
+	ParameterInBody:     "json",
+}
+
 type IApi interface {
 	GetAct() string
 	GetMethod() string
 	GetReqPath() string
 	GetGroup() string
+}
+
+func GetOpenApiJson(apiSet map[string]*ApiSet, appName string, version string) string {
+	routPaths := map[string]openApi.Path{}
+	components := map[string]*openApi.SchemaRef{}
+
+	for reqPath, v := range apiSet {
+		getComponents(components, v)
+
+		// 请求路径，文档参数兼容动态路由类型
+		re := regexp.MustCompile(`:(\w+)`)
+		newPath := re.ReplaceAllString(reqPath, "{$1}")
+
+		routPaths[newPath] = openApi.Path{
+			Ref:         "",
+			Summary:     "",
+			Description: "",
+			Connect:     getOpts(v.Connect),
+			Delete:      getOpts(v.Delete),
+			Get:         getOpts(v.Get),
+			Head:        getOpts(v.Head),
+			Options:     getOpts(v.Options),
+			Patch:       getOpts(v.Patch),
+			Post:        getOpts(v.Post),
+			Put:         getOpts(v.Put),
+			Trace:       getOpts(v.Trace),
+			Servers:     nil,
+			Parameters:  nil,
+		}
+	}
+
+	oai := &OpenApiV3{
+		Config:  openApi.Config{},
+		OpenAPI: "3.0.0",
+		Components: openApi.Components{
+			Schemas:         components,
+			Parameters:      nil,
+			Headers:         nil,
+			RequestBodies:   nil,
+			Responses:       nil,
+			SecuritySchemes: nil,
+			Examples:        nil,
+			Links:           nil,
+			Callbacks:       nil,
+		},
+		Info: openApi.Info{
+			Title:          appName,
+			Description:    "OpenApiV3.Info.Description",
+			TermsOfService: "OpenApiV3.Info.TermsOfService",
+			Contact:        nil,
+			License:        nil,
+			Version:        version,
+		},
+		Paths:        routPaths,
+		Security:     nil,
+		Servers:      nil,
+		Tags:         nil,
+		ExternalDocs: nil,
+	}
+
+	json, _ := json.Marshal(oai)
+	openApiV3Str := string(json)
+
+	return openApiV3Str
 }
 
 func getOpts(methodApi *Api) *openApi.Operation {
@@ -63,28 +136,21 @@ func getOpts(methodApi *Api) *openApi.Operation {
 	}
 
 	arrApiParam := []openApi.Parameter{}
-	for _, reqType := range methodApi.arrReqType {
+
+	f := func(reqType reflect.Type) {
+		if reqType == nil {
+			return
+		}
 		// 指针类型兼容
 		if reqType.Kind() == reflect.Pointer {
 			reqType = reqType.Elem()
 		}
 
-		// 方法是指针类型的方法
-		getHttpTypeFunc, ok := reflect.PointerTo(reqType).MethodByName("GetHttpParmaType")
-		if !ok {
-			errMsg := fmt.Errorf("<In getOpts> GetHttpParmaType Error")
-			tLog.Error(errMsg)
-			panic(errMsg)
-		}
-
-		arrRetValue := getHttpTypeFunc.Func.Call(
-			[]reflect.Value{reflect.New(reqType)},
-		)
-
-		InType := arrRetValue[0].String()
+		inType := GetInTypeByRefType(reqType)
 
 		// body
-		if InType == ParameterInBody {
+		switch inType {
+		case ParameterInBody:
 			refPath := strings.Replace(reqType.PkgPath()+"/"+reqType.Name(), "/", ".", -1)
 			reqBody.Content = map[string]openApi.MediaType{
 				"application/json": {
@@ -93,42 +159,46 @@ func getOpts(methodApi *Api) *openApi.Operation {
 					},
 				},
 			}
+		case ParameterInHeader, ParameterInQuery, ParameterInFormData, ParameterInPath:
+			// Parameters
+			if reqType.Kind() == reflect.Struct {
+				for i := 0; i < reqType.NumField(); i++ {
+					field := reqType.Field(i)
 
-			continue
-		}
+					isRequired := false
+					// 跳过匿名对象，即跳过继承类的判断
+					if field.Anonymous {
+						continue
+					}
 
-		// Parameters
-		if reqType.Kind() == reflect.Struct {
-			for i := 0; i < reqType.NumField(); i++ {
-				field := reqType.Field(i)
+					// Parameters数据值支持基础数据类型，如整型、浮点型、布尔型、字符串
+					switch field.Type.Kind() {
+					case reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
+						panic("Parameters supports only basic data types: numbers, floating-point numbers, strings, Booleans")
+					}
 
-				isRequired := true
-				// 跳过匿名对象，即跳过继承类的判断
-				if field.Anonymous {
-					continue
+					if strings.ToLower(field.Tag.Get("binding")) == "required" {
+						isRequired = true
+					}
+
+					tagName := field.Tag.Get(inType2Tag[inType])
+					arrApiParam = append(arrApiParam, openApi.Parameter{
+						Name:        tagName,
+						In:          inType,
+						Description: "Parameter.Description",
+						Required:    isRequired,
+						Schema:      &openApi.SchemaRef{},
+					})
 				}
-
-				// Parameters数据值支持基础数据类型，如整型、浮点型、布尔型、字符串
-				switch field.Type.Kind() {
-				case reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
-					panic("Parameters supports only basic data types: numbers, floating-point numbers, strings, Booleans")
-				}
-
-				if strings.ToLower(field.Tag.Get("required")) == "false" {
-					isRequired = false
-				}
-
-				arrApiParam = append(arrApiParam, openApi.Parameter{
-					Name:        field.Name,
-					In:          InType,
-					Description: "Parameter.Description",
-					Required:    isRequired,
-					Schema:      &openApi.SchemaRef{},
-				})
 			}
-
 		}
 	}
+
+	f(methodApi.ReqTypeSet.Body)
+	f(methodApi.ReqTypeSet.Uri)
+	f(methodApi.ReqTypeSet.Form)
+	f(methodApi.ReqTypeSet.Header)
+	f(methodApi.ReqTypeSet.Query)
 
 	refPath := strings.Replace(methodApi.RspType.Elem().PkgPath()+"/"+methodApi.RspType.Elem().Name(), "/", ".", -1)
 	return &openApi.Operation{
@@ -237,4 +307,173 @@ func getItems(tp reflect.Type, stack int) *openApi.Item {
 		Type:   swgType,
 		Format: swgFormat,
 	}
+}
+
+func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
+	f := func(schemaRefs map[string]*openApi.SchemaRef, api *Api) {
+		if api == nil {
+			return
+		}
+
+		tpStack := []reflect.Type{}
+		// 请求参数
+		ff := func(tp reflect.Type) {
+			if tp == nil {
+				return
+			}
+
+			// 指针类型兼容
+			if tp.Kind() == reflect.Pointer {
+				tp = tp.Elem()
+			}
+
+			tpStack = append(tpStack, tp)
+		}
+
+		ff(api.ReqTypeSet.Body)
+		ff(api.ReqTypeSet.Uri)
+		ff(api.ReqTypeSet.Form)
+		ff(api.ReqTypeSet.Header)
+		ff(api.ReqTypeSet.Query)
+
+		tpStack = append(tpStack, api.RspType)
+
+		for len(tpStack) > 0 {
+			tp := tpStack[0]
+			tpStack = tpStack[1:]
+
+			// 兼容指针类型和数组类型，若是指针类型则将tp的值设置为指针所指的地址的值
+			if tp.Kind() == reflect.Pointer {
+				tp = tp.Elem()
+			}
+
+			switch tp.Kind() {
+			case reflect.Struct:
+				refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
+
+				inType := GetInTypeByRefType(tp)
+
+				var ref *openApi.SchemaRef
+				var arrTypeNode []reflect.Type
+				if inType != "" {
+					ref, arrTypeNode = getSchemaRef(tp, inType2Tag[inType])
+				} else {
+					// response 目前没有提供标签的获取方法，默认使用json标签
+					ref, arrTypeNode = getSchemaRef(tp)
+				}
+
+				tpStack = append(tpStack, arrTypeNode...)
+				schemaRefs[refPath] = ref
+
+			case reflect.Slice:
+				for tp.Kind() == reflect.Slice {
+					tp = tp.Elem()
+				}
+
+				// 过滤基础数据类型
+				if tp.Kind() != reflect.Struct {
+					continue
+				}
+
+				refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
+
+				ref, arrTypeNode := getSchemaRef(tp)
+				tpStack = append(tpStack, arrTypeNode...)
+				schemaRefs[refPath] = ref
+			}
+		}
+	}
+
+	f(schemas, apiSet.Put)
+	f(schemas, apiSet.Post)
+	f(schemas, apiSet.Get)
+	f(schemas, apiSet.Trace)
+	f(schemas, apiSet.Head)
+	f(schemas, apiSet.Connect)
+	f(schemas, apiSet.Delete)
+	f(schemas, apiSet.Options)
+	f(schemas, apiSet.Patch)
+
+	return
+}
+
+func getSchemaRef(tp reflect.Type, args ...string) (*openApi.SchemaRef, []reflect.Type) {
+	properties := map[string]any{}
+	arrRequired := []string{}
+	arrParamType := []reflect.Type{}
+
+	for i := 0; i < tp.NumField(); i++ {
+		field := tp.Field(i)
+
+		// 跳过匿名字段，目的是跳过继承来的对象
+		if field.Anonymous == true {
+			continue
+		}
+
+		// 必须字段判断
+		if strings.ToLower(field.Tag.Get("binding")) == "required" {
+			arrRequired = append(arrRequired, field.Name)
+		}
+
+		fiedType := field.Type
+
+		tagName := "json"
+		if len(args) != 0 {
+			tagName = args[0]
+		}
+
+		propName := field.Tag.Get(tagName)
+
+		if propName == "" {
+			ErrMsg := fmt.Sprintf("Api Field Tag NoFound: %s", field.Name)
+			tLog.Errorf(ErrMsg)
+			panic(ErrMsg)
+		}
+
+		// 结构体类型递归判断
+		if fiedType.Kind() == reflect.Struct {
+			refPath := strings.Replace(field.Type.PkgPath()+"/"+tagName, "/", ".", -1)
+			properties[propName] = openApi.Propertie{
+				Description: field.Tag.Get("desc"),
+				Ref:         "#/components/schemas/" + refPath,
+			}
+			arrParamType = append(arrParamType, fiedType)
+		} else if fiedType.Kind() == reflect.Slice {
+			propertie := openApi.Propertie{
+				Type:  TypeArray,
+				Items: getItems(fiedType, 0),
+			}
+
+			properties[propName] = propertie
+
+			arrParamType = append(arrParamType, fiedType)
+		} else { // 常规类型
+			swgType, _ := goType2SwaggerTypeAndFormat(fiedType.Name())
+			properties[propName] = openApi.Propertie{
+				Description: field.Tag.Get("desc"),
+				Type:        swgType,
+			}
+		}
+
+	}
+
+	return &openApi.SchemaRef{
+		Properties: properties,
+		Type:       TypeObject,
+		Required:   arrRequired,
+	}, arrParamType
+}
+
+func GetInTypeByRefType(tp reflect.Type) string {
+	// 方法是指针类型的方法
+	getHttpTypeFunc, ok := reflect.PointerTo(tp).MethodByName("GetHttpParmaType")
+	if !ok {
+		return ""
+	}
+
+	arrRetValue := getHttpTypeFunc.Func.Call(
+		[]reflect.Value{reflect.New(tp)},
+	)
+
+	return arrRetValue[0].String()
 }

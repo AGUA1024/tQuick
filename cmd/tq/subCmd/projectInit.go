@@ -27,10 +27,10 @@ type confTempVar struct {
 }
 
 var ProjectInitCmd = &cobra.Command{
-	Use:   "create-project",
+	Use:     "create-project",
 	Aliases: []string{"cp"},
-	Short: "Create a new tQucik project",
-	Long:  `Create and initialize a back-end project for the tQuick framework`,
+	Short:   "Create a new tQucik project",
+	Long:    `Create and initialize a back-end project for the tQuick framework`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mainTpl := "main.tpl"
 		serverConfTpl := "serverConf.tpl"
@@ -105,6 +105,6 @@ var ProjectInitCmd = &cobra.Command{
 			panic(err)
 		}
 
-		fmt.Printf("tQuick project init Success!")
+		fmt.Println("tQuick project init Success!")
 	},
 }
