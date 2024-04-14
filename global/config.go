@@ -19,6 +19,7 @@ type Server struct {
 	App     string `yaml:"app"`
 	Version string `yaml:"version"`
 	Env     string `yaml:"env"`
+	Ip      string `yaml:"ip"`
 	Port    int    `yaml:"port"`
 }
 

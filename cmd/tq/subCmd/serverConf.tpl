@@ -2,6 +2,7 @@ server:                                    # 服务端配置
   app: {{.AppName}}                              # 业务的应用名
   version: 0.0.1                           # 应用程序版本号
   env: Development                         # 环境类型，分正式Production和非正式Development两种类型
+  ip: 127.0.0.1                            # 服务器ip地址
   port: 8000                               # 服务监听端口
 
 apiDoc:

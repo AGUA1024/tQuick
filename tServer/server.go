@@ -41,6 +41,9 @@ type Server struct {
 	// Name of the server (服务器的名称)
 	Name string
 
+	// 服务器 IP 地址
+	IP string
+
 	// 服务器监听端口号
 	port int
 
@@ -60,7 +63,7 @@ type Server struct {
 func (s *Server) Run() {
 	s.ApiDocInit()
 
-	err := endless.ListenAndServe(fmt.Sprintf(":%d", s.port), s.g)
+	err := endless.ListenAndServe(fmt.Sprintf("%s:%d", s.IP, s.port), s.g)
 	if err != nil {
 		errMsg := fmt.Sprintf("<In Run> %v", err)
 		tLog.Error(errMsg)
@@ -117,6 +120,7 @@ func (s *Server) ServerInit() {
 	serverConf := global.GetGlobalConfig().Server
 
 	s.Name = serverConf.App
+	s.IP = serverConf.Ip
 	s.port = serverConf.Port
 	s.env = serverConf.Env
 }
@@ -138,6 +142,7 @@ func (s *Server) ApiDocInit() {
 	c := s.g
 	appName := global.GetGlobalConfig().Server.App
 	version := global.GetGlobalConfig().Server.Version
+	ip := global.GetGlobalConfig().Server.Ip
 	port := global.GetGlobalConfig().Server.Port
 	swaggerPath := global.GetGlobalConfig().ApiDoc.SwaggerPath
 	apiFox := global.GetGlobalConfig().ApiDoc.ApiFox
@@ -152,7 +157,7 @@ func (s *Server) ApiDocInit() {
 	url := ginSwagger.URL("/swagger/openApi.json") // 指向API定义
 	c.GET(fmt.Sprintf("%s/*any", swaggerPath), ginSwagger.WrapHandler(swaggerFiles.Handler, url))
 
-	fmt.Println(fmt.Sprintf("Swagger documentation initialization is complete, please visit http://0.0.0.0:%d%s/swagger/index.html to check it", port, swaggerPath))
+	fmt.Println(fmt.Sprintf("Swagger documentation initialization is complete, please visit http://%s:%d%s/swagger/index.html to check it", ip, port, swaggerPath))
 
 	// apifox
 	if apiFox.Enable {
