@@ -10,7 +10,7 @@ type IServer interface {
 	LoadConfig()
 
 	// 路由注册
-	RouteRegister(ServSet map[string][]tIRoute.IController)
+	RouteRegister(RouteGroup tIRoute.IRouteGroup)
 
 	// Api文档初始化
 	ApiDocInit()
@@ -20,6 +20,9 @@ type IServer interface {
 }
 
 type HttpReqDecoder interface {
+	// 解析请求参数
 	ReqDecode(c *gin.Context) (any, error)
+
+	// 获取请求参数类型
 	GetHttpParmaType() string
 }

@@ -12,7 +12,7 @@ func init() {
 }
 
 type {{.ApiName}} struct {
-	{{.ApiGroupName}}RoutGroup `route:"{{.ApiName}}.routePath" method:"POST" act:"{{.ApiName}}.act"`
+	tServer.BaseRoute `route:"{{.ApiName}}.routePath" method:"POST" act:"{{.ApiName}}.act"`
 }
 
 type {{.ApiName}}ReqUri struct {

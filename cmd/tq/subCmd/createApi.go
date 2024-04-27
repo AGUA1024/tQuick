@@ -26,13 +26,12 @@ func init() {
 }
 
 var CreateApiCmd = &cobra.Command{
-	Use:   "create-api",
+	Use:     "create-api",
 	Aliases: []string{"ca"},
-	Short: "Generate api code",
-	Long:  `One click generates api code according to the name of the api`,
+	Short:   "Generate api code",
+	Long:    `One click generates api code according to the name of the api`,
 	Run: func(cmd *cobra.Command, args []string) {
 		createApiFileTpl := "createApiFile.tpl"
-		createApiGroupTpl := "createApiGroupFile.tpl"
 
 		cmdName, _ := cmd.Flags().GetString("name")
 		if cmdName == "" {
@@ -56,8 +55,8 @@ var CreateApiCmd = &cobra.Command{
 
 		arrNames := strings.Split(cmdName, ".")
 
-		if len(arrNames) != 2 {
-			fmt.Println("Please enter the input parameters in the format of \"{pkgName}.{apiName}\"")
+		if len(arrNames) < 2 {
+			fmt.Println("Please enter the input parameters in the format of \"{apiGroupName}.{apiSubGroupName...}.{apiName}\"")
 			return
 		}
 
@@ -67,8 +66,8 @@ var CreateApiCmd = &cobra.Command{
 		arrDirsName := arrNames[:len(arrNames)-1]
 
 		dirPath := "./api"
-		for _, v := range arrDirsName {
-			dirPath += "/" + v
+		for _, dirName := range arrDirsName {
+			dirPath += "/" + dirName
 
 			if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 				err = os.MkdirAll(dirPath, 0755)
@@ -76,6 +75,16 @@ var CreateApiCmd = &cobra.Command{
 					fmt.Printf("Create folder[%s] failed: %v", dirPath, err)
 					return
 				}
+
+				groupFileName := dirPath + "/" + dirName + ".go"
+				fmt.Println("groupFileName: ", groupFileName)
+				groupFileData := apiTempVar{
+					PkgName:      FirstLower(dirName),
+					ApiGroupName: FirstUpper(dirName),
+				}
+
+				CreateGroupFile(groupFileName, groupFileData)
+				fmt.Println("groupFileName: ", groupFileName)
 			}
 		}
 
@@ -94,7 +103,7 @@ var CreateApiCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println(apiFile, " ", os.IsExist(err))
+		fmt.Println(apiFile, " IsExist:", os.IsExist(err))
 
 		apiTempBuf, err := createApiTplFS.ReadFile(createApiFileTpl)
 		apiTemp, err := template.New("apiTemp").Parse(string(apiTempBuf))
@@ -110,27 +119,6 @@ var CreateApiCmd = &cobra.Command{
 		err = apiTemp.Execute(file, data)
 		if err != nil {
 			panic(err)
-		}
-
-		// apiRouteGroup不存在，则创建
-		apiRouteGroupFile := dirPath + "/" + pkgName + ".go"
-		if _, err := os.Stat(apiRouteGroupFile); os.IsNotExist(err) {
-			apiGroupTempBuf, err := createApiGroupTplFS.ReadFile(createApiGroupTpl)
-			apiGroupTemp, err := template.New("apiGroupTemp").Parse(string(apiGroupTempBuf))
-			if err != nil {
-				panic(err)
-			}
-
-			routeGroupfile, err := os.Create(apiRouteGroupFile)
-			if err != nil {
-				panic(err)
-			}
-			defer routeGroupfile.Close()
-			err = apiGroupTemp.Execute(routeGroupfile, data)
-			if err != nil {
-				panic(err)
-			}
-
 		}
 
 		fmt.Printf("Create Api Success: %s", apiFile)
@@ -151,4 +139,31 @@ func FirstUpper(s string) string {
 		return ""
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+func CreateGroupFile(groupFileName string, data apiTempVar) {
+	createApiGroupTpl := "createApiGroupFile.tpl"
+
+	if _, err := os.Stat(groupFileName); os.IsNotExist(err) {
+		apiGroupTempBuf, err := createApiGroupTplFS.ReadFile(createApiGroupTpl)
+		if err != nil {
+			panic(err)
+		}
+
+		apiGroupTemp, err := template.New("apiGroupTemp").Parse(string(apiGroupTempBuf))
+		if err != nil {
+			panic(err)
+		}
+
+		routeGroupFile, err := os.Create(groupFileName)
+		if err != nil {
+			panic(err)
+		}
+		defer routeGroupFile.Close()
+
+		err = apiGroupTemp.Execute(routeGroupFile, data)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
