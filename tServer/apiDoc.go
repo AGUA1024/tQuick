@@ -1,36 +1,88 @@
 package tServer
 
-import "reflect"
+import (
+	"net/http"
+	"reflect"
+)
 
 type Api struct {
 	Method     string
 	ReqPath    string
 	Group      string
 	Act        string
-	ReqTypeSet ReqSet
+	ReqTypeSet []ReqParam
 	RspType    reflect.Type
 	HandleFunc reflect.Value
 }
 
-type ReqSet struct {
-	Body   reflect.Type
-	Form   reflect.Type
-	Query  reflect.Type
-	Uri    reflect.Type
-	Header reflect.Type
+type ReqParam struct {
+	ParmIn    string
+	ParamType reflect.Type
 }
 
 type ApiSet struct {
-	Get     *Api
-	Post    *Api
-	Put     *Api
-	Patch   *Api
-	Trace   *Api
-	Head    *Api
-	Options *Api
-	Delete  *Api
-	Connect *Api
-	Any     *Api
+	Method string
+	Api    *Api
+}
+
+func (a *ApiSet) SetMethodGet() {
+	a.Method = http.MethodGet
+}
+
+func (a *ApiSet) SetMethodPost() {
+	a.Method = http.MethodPost
+}
+
+func (a *ApiSet) SetMethodDelete() {
+	a.Method = http.MethodDelete
+}
+
+func (a *ApiSet) SetMethodPut() {
+	a.Method = http.MethodPut
+}
+
+func (a *ApiSet) SetMethodOptions() {
+	a.Method = http.MethodOptions
+}
+
+func (a *ApiSet) SetMethodHead() {
+	a.Method = http.MethodHead
+}
+
+func (a *ApiSet) SetMethodPatch() {
+	a.Method = http.MethodPatch
+}
+
+func (a *ApiSet) SetMethodTrace() {
+	a.Method = http.MethodTrace
+}
+
+func (a *ApiSet) SetMethodConnect() {
+	a.Method = http.MethodConnect
+}
+
+func (a *ApiSet) SetMethodAny() {
+	a.Method = "ANY"
+}
+
+func (r *ReqParam) SetParmInBody() {
+	r.ParmIn = ParameterInBody
+}
+
+func (r *ReqParam) SetParmInQuery() {
+	r.ParmIn = ParameterInQuery
+}
+
+func (r *ReqParam) SetParmInHeader() {
+	r.ParmIn = ParameterInHeader
+}
+
+func (r *ReqParam) SetParmInFormData() {
+	r.ParmIn = ParameterInFormData
+}
+
+func (r *ReqParam) SetParmInPath() {
+	r.ParmIn = ParameterInPath
 }
 
 func (a Api) GetMethod() string {

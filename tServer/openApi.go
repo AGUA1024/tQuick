@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/AGUA1024/tQuick/tLog"
 	"github.com/AGUA1024/tQuick/tServer/openApi"
+	"net/http"
 	"reflect"
 	"regexp"
 	"strings"
@@ -72,22 +73,29 @@ func GetOpenApiJson(apiSet map[string]*ApiSet, appName string, version string) s
 		re := regexp.MustCompile(`:(\w+)`)
 		newPath := re.ReplaceAllString(reqPath, "{$1}")
 
-		routPaths[newPath] = openApi.Path{
-			Ref:         "",
-			Summary:     "",
-			Description: "",
-			Connect:     getOpts(v.Connect),
-			Delete:      getOpts(v.Delete),
-			Get:         getOpts(v.Get),
-			Head:        getOpts(v.Head),
-			Options:     getOpts(v.Options),
-			Patch:       getOpts(v.Patch),
-			Post:        getOpts(v.Post),
-			Put:         getOpts(v.Put),
-			Trace:       getOpts(v.Trace),
-			Servers:     nil,
-			Parameters:  nil,
+		openApiPath := openApi.Path{}
+		switch v.Method {
+		case http.MethodGet:
+			openApiPath.Get = getOpts(v.Api)
+		case http.MethodPost:
+			openApiPath.Post = getOpts(v.Api)
+		case http.MethodDelete:
+			openApiPath.Delete = getOpts(v.Api)
+		case http.MethodPut:
+			openApiPath.Put = getOpts(v.Api)
+		case http.MethodConnect:
+			openApiPath.Connect = getOpts(v.Api)
+		case http.MethodTrace:
+			openApiPath.Trace = getOpts(v.Api)
+		case http.MethodPatch:
+			openApiPath.Patch = getOpts(v.Api)
+		case http.MethodHead:
+			openApiPath.Head = getOpts(v.Api)
+		case http.MethodOptions:
+			openApiPath.Options = getOpts(v.Api)
 		}
+
+		routPaths[newPath] = openApiPath
 	}
 
 	oai := &OpenApiV3{
@@ -137,10 +145,12 @@ func getOpts(methodApi *Api) *openApi.Operation {
 
 	arrApiParam := []openApi.Parameter{}
 
-	f := func(reqType reflect.Type) {
+	for _, v := range methodApi.ReqTypeSet {
+		reqType := v.ParamType
 		if reqType == nil {
-			return
+			return nil
 		}
+
 		// 指针类型兼容
 		if reqType.Kind() == reflect.Pointer {
 			reqType = reqType.Elem()
@@ -193,12 +203,6 @@ func getOpts(methodApi *Api) *openApi.Operation {
 			}
 		}
 	}
-
-	f(methodApi.ReqTypeSet.Body)
-	f(methodApi.ReqTypeSet.Uri)
-	f(methodApi.ReqTypeSet.Form)
-	f(methodApi.ReqTypeSet.Header)
-	f(methodApi.ReqTypeSet.Query)
 
 	refPath := strings.Replace(methodApi.RspType.Elem().PkgPath()+"/"+methodApi.RspType.Elem().Name(), "/", ".", -1)
 	return &openApi.Operation{
@@ -310,89 +314,75 @@ func getItems(tp reflect.Type, stack int) *openApi.Item {
 }
 
 func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
-	f := func(schemaRefs map[string]*openApi.SchemaRef, api *Api) {
-		if api == nil {
+	api := apiSet.Api
+
+	if api == nil {
+		return
+	}
+
+	tpStack := []reflect.Type{}
+	// 请求参数
+
+	for _, v := range api.ReqTypeSet {
+		tp := v.ParamType
+		if tp == nil {
 			return
 		}
 
-		tpStack := []reflect.Type{}
-		// 请求参数
-		ff := func(tp reflect.Type) {
-			if tp == nil {
-				return
-			}
-
-			// 指针类型兼容
-			if tp.Kind() == reflect.Pointer {
-				tp = tp.Elem()
-			}
-
-			tpStack = append(tpStack, tp)
+		// 指针类型兼容
+		if tp.Kind() == reflect.Pointer {
+			tp = tp.Elem()
 		}
 
-		ff(api.ReqTypeSet.Body)
-		ff(api.ReqTypeSet.Uri)
-		ff(api.ReqTypeSet.Form)
-		ff(api.ReqTypeSet.Header)
-		ff(api.ReqTypeSet.Query)
-
-		tpStack = append(tpStack, api.RspType)
-
-		for len(tpStack) > 0 {
-			tp := tpStack[0]
-			tpStack = tpStack[1:]
-
-			// 兼容指针类型和数组类型，若是指针类型则将tp的值设置为指针所指的地址的值
-			if tp.Kind() == reflect.Pointer {
-				tp = tp.Elem()
-			}
-
-			switch tp.Kind() {
-			case reflect.Struct:
-				refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
-
-				inType := GetInTypeByRefType(tp)
-
-				var ref *openApi.SchemaRef
-				var arrTypeNode []reflect.Type
-				if inType != "" {
-					ref, arrTypeNode = getSchemaRef(tp, inType2Tag[inType])
-				} else {
-					// response 目前没有提供标签的获取方法，默认使用json标签
-					ref, arrTypeNode = getSchemaRef(tp)
-				}
-
-				tpStack = append(tpStack, arrTypeNode...)
-				schemaRefs[refPath] = ref
-
-			case reflect.Slice:
-				for tp.Kind() == reflect.Slice {
-					tp = tp.Elem()
-				}
-
-				// 过滤基础数据类型
-				if tp.Kind() != reflect.Struct {
-					continue
-				}
-
-				refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
-
-				ref, arrTypeNode := getSchemaRef(tp)
-				tpStack = append(tpStack, arrTypeNode...)
-				schemaRefs[refPath] = ref
-			}
-		}
+		tpStack = append(tpStack, tp)
 	}
 
-	f(schemas, apiSet.Put)
-	f(schemas, apiSet.Post)
-	f(schemas, apiSet.Get)
-	f(schemas, apiSet.Trace)
-	f(schemas, apiSet.Head)
-	f(schemas, apiSet.Connect)
-	f(schemas, apiSet.Delete)
-	f(schemas, apiSet.Options)
-	f(schemas, apiSet.Patch)
+	tpStack = append(tpStack, api.RspType)
+
+	for len(tpStack) > 0 {
+		tp := tpStack[0]
+		tpStack = tpStack[1:]
+
+		// 兼容指针类型和数组类型，若是指针类型则将tp的值设置为指针所指的地址的值
+		if tp.Kind() == reflect.Pointer {
+			tp = tp.Elem()
+		}
+
+		switch tp.Kind() {
+		case reflect.Struct:
+			refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
+
+			inType := GetInTypeByRefType(tp)
+
+			var ref *openApi.SchemaRef
+			var arrTypeNode []reflect.Type
+			if inType != "" {
+				ref, arrTypeNode = getSchemaRef(tp, inType2Tag[inType])
+			} else {
+				// response 目前没有提供标签的获取方法，默认使用json标签
+				ref, arrTypeNode = getSchemaRef(tp)
+			}
+
+			tpStack = append(tpStack, arrTypeNode...)
+			schemas[refPath] = ref
+
+		case reflect.Slice:
+			for tp.Kind() == reflect.Slice {
+				tp = tp.Elem()
+			}
+
+			// 过滤基础数据类型
+			if tp.Kind() != reflect.Struct {
+				continue
+			}
+
+			refPath := strings.Replace(tp.PkgPath()+"/"+tp.Name(), "/", ".", -1)
+
+			ref, arrTypeNode := getSchemaRef(tp)
+			tpStack = append(tpStack, arrTypeNode...)
+			schemas[refPath] = ref
+		}
+	}
 
 	return
 }

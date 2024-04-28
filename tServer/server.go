@@ -78,42 +78,41 @@ func (s *Server) ApiRegister(api *Api) {
 		s.Api[api.ReqPath] = &ApiSet{}
 	}
 
-	f := func(a *Api) *Api {
-		if isSet && a != nil {
-			errMsg := fmt.Sprintf("The api is repeatedly defined. [%s]:%s", api.Method, api.ReqPath)
-			tLog.Error(errMsg)
-			panic(errMsg)
-		}
-
-		return api
+	sApi := s.Api[api.ReqPath].Api
+	if isSet && sApi != nil {
+		errMsg := fmt.Sprintf("The api is repeatedly defined. [%s]:%s", api.Method, api.ReqPath)
+		tLog.Error(errMsg)
+		panic(errMsg)
 	}
 
 	switch api.Method {
 	case http.MethodGet:
-		s.Api[api.ReqPath].Get = f(s.Api[api.ReqPath].Get)
+		s.Api[api.ReqPath].SetMethodGet()
 	case http.MethodPost:
-		s.Api[api.ReqPath].Post = f(s.Api[api.ReqPath].Post)
+		s.Api[api.ReqPath].SetMethodPost()
 	case http.MethodPut:
-		s.Api[api.ReqPath].Put = f(s.Api[api.ReqPath].Put)
+		s.Api[api.ReqPath].SetMethodPut()
 	case http.MethodPatch:
-		s.Api[api.ReqPath].Patch = f(s.Api[api.ReqPath].Patch)
+		s.Api[api.ReqPath].SetMethodPatch()
 	case http.MethodTrace:
-		s.Api[api.ReqPath].Trace = f(s.Api[api.ReqPath].Trace)
+		s.Api[api.ReqPath].SetMethodTrace()
 	case http.MethodHead:
-		s.Api[api.ReqPath].Head = f(s.Api[api.ReqPath].Head)
+		s.Api[api.ReqPath].SetMethodHead()
 	case http.MethodOptions:
-		s.Api[api.ReqPath].Options = f(s.Api[api.ReqPath].Options)
+		s.Api[api.ReqPath].SetMethodOptions()
 	case http.MethodDelete:
-		s.Api[api.ReqPath].Delete = f(s.Api[api.ReqPath].Delete)
+		s.Api[api.ReqPath].SetMethodDelete()
 	case http.MethodConnect:
-		s.Api[api.ReqPath].Connect = f(s.Api[api.ReqPath].Connect)
+		s.Api[api.ReqPath].SetMethodConnect()
 	case "ANY":
-		s.Api[api.ReqPath].Any = f(s.Api[api.ReqPath].Any)
+		s.Api[api.ReqPath].SetMethodAny()
 	default:
 		errMsg := "<In ApiRegister> error Method"
 		tLog.Error(errMsg)
 		panic(errMsg)
 	}
+
+	s.Api[api.ReqPath].Api = sApi
 }
 
 func (s *Server) ServerInit() {

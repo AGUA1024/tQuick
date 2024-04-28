@@ -1,7 +1,6 @@
 package tServer
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -137,7 +136,6 @@ func dfsRouteHandle(s Server, group tIRoute.IRouteGroup, arr []gin.HandlerFunc) 
 }
 
 func (s Server) RouteRegister(routeGroup tIRoute.IRouteGroup) {
-
 	dfsRouteHandle(s, routeGroup, routeGroup.GetAllMiddlewares())
 }
 
@@ -167,7 +165,7 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 		panic(errMsg)
 	}
 
-	reqTypeSet := ReqSet{}
+	arrReqParam := []ReqParam{}
 
 	handleFunc, ok := st.MethodByName("Handle")
 	if !ok {
@@ -194,18 +192,22 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 			reflect.New(paramType.Elem()),
 		})[0].String()
 
+		reqParam := ReqParam{}
 		switch tp {
 		case ParameterInBody:
-			reqTypeSet.Body = paramType
+			reqParam.SetParmInBody()
 		case ParameterInQuery:
-			reqTypeSet.Query = paramType
+			reqParam.SetParmInQuery()
 		case ParameterInFormData:
-			reqTypeSet.Form = paramType
+			reqParam.SetParmInFormData()
 		case ParameterInPath:
-			reqTypeSet.Uri = paramType
+			reqParam.SetParmInPath()
 		case ParameterInHeader:
-			reqTypeSet.Header = paramType
+			reqParam.SetParmInHeader()
 		}
+		reqParam.ParamType = paramType
+
+		arrReqParam = append(arrReqParam, reqParam)
 	}
 
 	// 构造api实例对象
@@ -214,7 +216,7 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 		ReqPath:    field.Tag.Get("route"),
 		Group:      route.GetRouteGroup(),
 		Act:        field.Tag.Get("act"),
-		ReqTypeSet: reqTypeSet,
+		ReqTypeSet: arrReqParam,
 		RspType:    handleFunc.Type.Out(0),
 		HandleFunc: handleFunc.Func,
 	}
@@ -229,9 +231,11 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 			reflect.ValueOf(c),
 		}
 
-		f := func(reqType reflect.Type) error {
+		for _, reqParam := range arrReqParam {
+			reqType := reqParam.ParamType
 			if reqType == nil {
-				return nil
+				tLog.Error("<In RouteRegister> request paramType is nil!")
+				return
 			}
 
 			if reqType.Kind() != reflect.Pointer {
@@ -240,9 +244,8 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 
 			decodeFunc, ok := reqType.MethodByName("ReqDecode")
 			if !ok {
-				errMsg := "<In RouteRegister> request obj error!"
-				tLog.Error(errMsg)
-				return errors.New(errMsg)
+				tLog.Error("<In RouteRegister> request obj error!")
+				return
 			}
 
 			arrRetValue := decodeFunc.Func.Call(
@@ -259,31 +262,10 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 						"Msg":  err.Error(),
 					},
 				)
-				return err
+				return
 			}
 
 			handleFuncParma = append(handleFuncParma, reflect.ValueOf(param))
-			return nil
-		}
-
-		if f(reqTypeSet.Body) != nil {
-			return
-		}
-
-		if f(reqTypeSet.Form) != nil {
-			return
-		}
-
-		if f(reqTypeSet.Uri) != nil {
-			return
-		}
-
-		if f(reqTypeSet.Query) != nil {
-			return
-		}
-
-		if f(reqTypeSet.Header) != nil {
-			return
 		}
 
 		retValue := api.HandleFunc.Call(handleFuncParma)
