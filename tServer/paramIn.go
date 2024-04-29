@@ -10,55 +10,181 @@ import (
 )
 
 const (
-	ParameterInHeader   = `header`
-	ParameterInPath     = `path`
-	ParameterInQuery    = `query`
-	ParameterInBody     = `body`
-	ParameterInFormData = `formData`
+	OpenApiInHeader   = `header`
+	OpenApiInPath     = `path`
+	OpenApiInQuery    = `query`
+	OpenApiInBody     = `body`
+	OpenApiInFormData = `formData`
 )
 
-type HttpJsonBody struct {
+/* Param接口 */
+type IParam interface {
+	OpenApiInType() string
+	ReqDecode(*gin.Context, reflect.Type) (any, error)
+	ShouldBindType(*gin.Context, any) error
 }
 
+type IBodyParam interface {
+	IParam
+}
+
+type IUriParam interface {
+	IParam
+}
+
+/* Param类 */
 type HttpHeader struct {
+	IParam
 }
 
 type HttpQuery struct {
+	IParam
 }
 
-type HttpFormData struct {
+type HttpForm struct {
+	IParam
+}
+
+type HttpFormPost struct {
+	IParam
+}
+
+type HttpFormMultipart struct {
+	IParam
+}
+
+type HttpJson struct {
+	IBodyParam
+}
+
+type HttpXml struct {
+	IBodyParam
+}
+
+type HttpProtoBuf struct {
+	IBodyParam
+}
+
+type HttpMsgPack struct {
+	IBodyParam
+}
+
+type HttpYaml struct {
+	IBodyParam
+}
+
+type HttpToml struct {
+	IBodyParam
 }
 
 type HttpUri struct {
+	IUriParam
 }
 
-func (j *HttpJsonBody) GetHttpParmaType() string {
-	return ParameterInBody
+/* Param方法 */
+func (j *HttpHeader) OpenApiInType() string {
+	return OpenApiInHeader
 }
 
-func (j *HttpHeader) GetHttpParmaType() string {
-	return ParameterInHeader
+func (j *HttpQuery) OpenApiInType() string {
+	return OpenApiInQuery
 }
 
-func (j *HttpQuery) GetHttpParmaType() string {
-	return ParameterInQuery
+func (j *HttpForm) OpenApiInType() string {
+	return OpenApiInFormData
 }
 
-func (j *HttpFormData) GetHttpParmaType() string {
-	return ParameterInFormData
+func (j *HttpFormPost) OpenApiInType() string {
+	return OpenApiInFormData
 }
 
-func (j *HttpUri) GetHttpParmaType() string {
-	return ParameterInPath
+func (j *HttpFormMultipart) OpenApiInType() string {
+	return OpenApiInFormData
+}
+
+func (j *HttpJson) OpenApiInType() string {
+	return OpenApiInFormData
+}
+
+func (j *HttpXml) OpenApiInType() string {
+	return OpenApiInBody
+}
+
+func (j *HttpProtoBuf) OpenApiInType() string {
+	return OpenApiInBody
+}
+
+func (j *HttpMsgPack) OpenApiInType() string {
+	return OpenApiInBody
+}
+
+func (j *HttpYaml) OpenApiInType() string {
+	return OpenApiInBody
+}
+
+func (j *HttpToml) OpenApiInType() string {
+	return OpenApiInBody
+}
+
+func (j *HttpUri) OpenApiInType() string {
+	return OpenApiInPath
+}
+
+func (j *HttpHeader) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindHeader(obj)
+}
+
+func (j *HttpQuery) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindQuery(obj)
+}
+
+func (j *HttpForm) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindWith(obj, binding.Form)
+}
+
+func (j *HttpFormPost) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindWith(obj, binding.Form)
+}
+
+func (j *HttpFormMultipart) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindWith(obj, binding.FormMultipart)
+}
+
+func (j *HttpJson) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindJSON(obj)
+}
+
+func (j *HttpXml) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindXml(obj)
+}
+
+func (j *HttpProtoBuf) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindWith(obj, binding.ProtoBuf)
+}
+
+func (j *HttpMsgPack) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindWith(obj, binding.MsgPack)
+}
+
+func (j *HttpYaml) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindYaml(obj)
+}
+
+func (j *HttpToml) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindToml(obj)
+}
+
+func (j *HttpUri) ShouldBindType(c *gin.Context, obj any) error {
+	return c.ShouldBindJUri(obj)
 }
 
 const (
 	ERROR_HTTP_REQUEST = "Invalid Request"
 )
 
-func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+func _ReqDecode(param IParam, c *gin.Context, reqType reflect.Type) (any, error) {
 	instance := reflect.New(reqType.Elem()).Interface()
-	err := c.ShouldBindWith(instance, binding.JSON)
+	err := param.ShouldBindType(c, instance)
 	if err != nil {
 		tLog.Error(fmt.Sprintf("<In HttpJsonBody.ReqDecode> %s: %v", ERROR_HTTP_REQUEST, err))
 		return nil, errors.New(ERROR_HTTP_REQUEST)
@@ -68,45 +194,49 @@ func (j *HttpJsonBody) ReqDecode(c *gin.Context, reqType reflect.Type) (any, err
 }
 
 func (j *HttpHeader) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
-	instance := reflect.New(reqType.Elem()).Interface()
-	err := c.ShouldBindWith(instance, binding.Header)
-	if err != nil {
-		tLog.Error(fmt.Sprintf("<In HttpHeader.ReqDecode> %s: %v", ERROR_HTTP_REQUEST, err))
-		return nil, errors.New(ERROR_HTTP_REQUEST)
-	}
-
-	return instance, nil
+	return _ReqDecode(j, c, reqType)
 }
 
-func (j *HttpQuery) ReqDecode(c *gin.Context, reqType reflect.Type) (interface{}, error) {
-	instance := reflect.New(reqType.Elem()).Interface()
-	err := c.ShouldBindWith(instance, binding.Query)
-	if err != nil {
-		tLog.Error(fmt.Sprintf("<In HttpQuery.ReqDecode> %s: %v", ERROR_HTTP_REQUEST, err))
-		return nil, errors.New(ERROR_HTTP_REQUEST)
-	}
-
-	return instance, nil
+func (j *HttpQuery) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
 }
 
-func (j *HttpFormData) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
-	instance := reflect.New(reqType.Elem()).Interface()
-	err := c.ShouldBindWith(instance, binding.Form)
-	if err != nil {
-		tLog.Error(fmt.Sprintf("<In HttpFormData.ReqDecode> %s: %v", ERROR_HTTP_REQUEST, err))
-		return nil, errors.New(ERROR_HTTP_REQUEST)
-	}
+func (j *HttpForm) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
 
-	return instance, nil
+func (j *HttpFormPost) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
+
+func (j *HttpFormMultipart) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
+
+func (j *HttpJson) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
+
+func (j *HttpXml) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
+
+func (j *HttpProtoBuf) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
+
+func (j *HttpMsgPack) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
+
+func (j *HttpYaml) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
+}
+
+func (j *HttpToml) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
+	return _ReqDecode(j, c, reqType)
 }
 
 func (j *HttpUri) ReqDecode(c *gin.Context, reqType reflect.Type) (any, error) {
-	instance := reflect.New(reqType.Elem()).Interface()
-	err := c.ShouldBindUri(instance)
-	if err != nil {
-		tLog.Error(fmt.Sprintf("<In HttpUri.ReqDecode> %s: %v", ERROR_HTTP_REQUEST, err))
-		return nil, errors.New(ERROR_HTTP_REQUEST)
-	}
-
-	return instance, nil
+	return _ReqDecode(j, c, reqType)
 }
