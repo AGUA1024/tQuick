@@ -145,7 +145,7 @@ func getOpts(methodApi *Api) *openApi.Operation {
 
 	arrApiParam := []openApi.Parameter{}
 
-	for _, v := range methodApi.ReqTypeSet {
+	for _, v := range methodApi.ArrReqType {
 		reqType := v.ParamType
 		if reqType == nil {
 			return nil
@@ -323,7 +323,7 @@ func getComponents(schemas map[string]*openApi.SchemaRef, apiSet *ApiSet) {
 	tpStack := []reflect.Type{}
 	// 请求参数
 
-	for _, v := range api.ReqTypeSet {
+	for _, v := range api.ArrReqType {
 		tp := v.ParamType
 		if tp == nil {
 			return

@@ -10,7 +10,7 @@ type Api struct {
 	ReqPath    string
 	Group      string
 	Act        string
-	ReqTypeSet []ReqParam
+	ArrReqType []ReqParam
 	RspType    reflect.Type
 	HandleFunc reflect.Value
 }

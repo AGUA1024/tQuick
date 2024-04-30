@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"text/template"
+	"unicode"
 )
 
 type apiTempVar struct {
@@ -61,6 +62,11 @@ var CreateApiCmd = &cobra.Command{
 		}
 
 		apiName := arrNames[len(arrNames)-1]
+		if !isLegalVarName(apiName) {
+			fmt.Println("The incoming parameter name is not valid.")
+			return
+		}
+
 		pkgName := arrNames[len(arrNames)-2]
 
 		arrDirsName := arrNames[:len(arrNames)-1]
@@ -166,4 +172,27 @@ func CreateGroupFile(groupFileName string, data apiTempVar) {
 			panic(err)
 		}
 	}
+}
+
+func isLegalVarName(varName string) bool {
+	// 变量名不能为空
+	if len(varName) == 0 {
+		return false
+	}
+
+	// 检测变量名的第一个字符是否为字母或者下划线，不可以是数字
+	firstChar := rune(varName[0])
+	if !unicode.IsLetter(firstChar) && firstChar != '_' {
+		return false
+	}
+
+	// 检测变量名的其余字符是否为字母、数字或下划线
+	for _, char := range varName[1:] {
+		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '_' {
+			return false
+		}
+	}
+
+	// 如果以上条件都不满足，则变量名合法
+	return true
 }

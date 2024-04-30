@@ -143,26 +143,19 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 
 	st := reflect.TypeOf(ctrl)
 
-	var field reflect.StructField
-	if st.Kind() == reflect.Ptr {
-		field = st.Elem().Field(0)
-	} else {
-		field = st.Field(0)
-	}
-
-	if field.Tag.Get("route") == "" {
+	routeField := st.Elem().Field(0)
+	
+	if routeField.Tag.Get("route") == "" {
 		errMsg := "<In RouteRegister> ServRoute is missing routing configuration"
 		tLog.Error(errMsg)
 		panic(errMsg)
 	}
 
-	if field.Tag.Get("method") == "" {
+	if routeField.Tag.Get("method") == "" {
 		errMsg := "<In RouteRegister> ServRoute is missing the configuration of the http method"
 		tLog.Error(errMsg)
 		panic(errMsg)
 	}
-
-	arrReqParam := []ReqParam{}
 
 	handleFunc, ok := st.MethodByName("Handle")
 	if !ok {
@@ -188,40 +181,13 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 		arrParamIn = append(arrParamIn, param)
 	}
 
-	for _, param := range arrParamIn {
-		instance, ok := param.Interface().(IParam)
-		if !ok {
-			errMsg := fmt.Sprintf("<In RouteRegister> param[%s] is Not IParam", param.Type())
-			tLog.Error(errMsg)
-			panic(errMsg)
-		}
-		tp := instance.OpenApiInType()
-
-		reqParam := ReqParam{}
-		switch tp {
-		case OpenApiInBody:
-			reqParam.SetParmInBody()
-		case OpenApiInQuery:
-			reqParam.SetParmInQuery()
-		case OpenApiInFormData:
-			reqParam.SetParmInFormData()
-		case OpenApiInPath:
-			reqParam.SetParmInPath()
-		case OpenApiInHeader:
-			reqParam.SetParmInHeader()
-		}
-		reqParam.ParamType = param.Type()
-
-		arrReqParam = append(arrReqParam, reqParam)
-	}
-
 	// 构造api实例对象
 	api := &Api{
-		Method:     strings.ToUpper(field.Tag.Get("method")),
-		ReqPath:    field.Tag.Get("route"),
+		Method:     strings.ToUpper(routeField.Tag.Get("method")),
+		ReqPath:    routeField.Tag.Get("route"),
 		Group:      getApiGroupName(route),
-		Act:        field.Tag.Get("act"),
-		ReqTypeSet: arrReqParam,
+		Act:        routeField.Tag.Get("act"),
+		ArrReqType: getArrReqParam(arrParamIn),
 		RspType:    handleFunc.Type.Out(0),
 		HandleFunc: handleFunc.Func,
 	}
@@ -295,4 +261,36 @@ func getApiGroupName(route any) string {
 	}
 
 	panic("<In getApiGroupName> Error ApiGroup: " + pkgPath)
+}
+
+func getArrReqParam(arrParamIn []reflect.Value) []ReqParam {
+	arrReqParam := []ReqParam{}
+	for _, param := range arrParamIn {
+		instance, ok := param.Interface().(IParam)
+		if !ok {
+			errMsg := fmt.Sprintf("<In RouteRegister> param[%s] is Not IParam", param.Type())
+			tLog.Error(errMsg)
+			panic(errMsg)
+		}
+		tp := instance.OpenApiInType()
+
+		reqParam := ReqParam{}
+		switch tp {
+		case OpenApiInBody:
+			reqParam.SetParmInBody()
+		case OpenApiInQuery:
+			reqParam.SetParmInQuery()
+		case OpenApiInFormData:
+			reqParam.SetParmInFormData()
+		case OpenApiInPath:
+			reqParam.SetParmInPath()
+		case OpenApiInHeader:
+			reqParam.SetParmInHeader()
+		}
+		reqParam.ParamType = param.Type()
+
+		arrReqParam = append(arrReqParam, reqParam)
+	}
+
+	return arrReqParam
 }
