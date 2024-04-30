@@ -10,9 +10,6 @@ type IRoute interface {
 
 	// 获取当前路由的所有中间件
 	GetMiddleWares() []gin.HandlerFunc
-
-	// 获取当前路由组名
-	GetRouteGroup() string
 }
 
 type IRouteGroup interface {

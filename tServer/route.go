@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/AGUA1024/tQuick/tIRoute"
@@ -82,10 +83,6 @@ func (r *BaseRoute) WithMiddlewares(handlerFunc ...gin.HandlerFunc) tIRoute.IRou
 
 func (r *BaseRoute) GetMiddleWares() []gin.HandlerFunc {
 	return r.Middlewares
-}
-
-func (r *BaseRoute) GetRouteGroup() string {
-	return reflect.TypeOf(r).Elem().PkgPath()
 }
 
 func RouteRegister(route tIRoute.IRoute, middlewares ...gin.HandlerFunc) {
@@ -174,13 +171,31 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 		panic(errMsg)
 	}
 
-	for i := 1; i < handleFunc.Type.NumIn(); i++ {
-		paramType := handleFunc.Type.In(i)
+	// Handle函数参数校验
+	if handleFunc.Type.NumIn() != 3 || handleFunc.Type.In(1) != reflect.TypeOf(&gin.Context{}) {
+		errMsg := "<In RouteRegister> An error occurred with the parameters of the 'Handle' function."
+		tLog.Error(errMsg)
+		panic(errMsg)
+	}
 
-		if reflect.TypeOf(&gin.Context{}) == paramType {
-			continue
-		}
+	request := reflect.New(handleFunc.Type.In(2).Elem())
 
+	uri := request.Elem().FieldByName("Uri")
+	uri.Set(reflect.New(uri.Type().Elem()))
+
+	header := request.Elem().FieldByName("Header")
+	header.Set(reflect.New(header.Type().Elem()))
+
+	query := request.Elem().FieldByName("Query")
+	query.Set(reflect.New(query.Type().Elem()))
+
+	body := request.Elem().FieldByName("Body")
+	body.Set(reflect.New(body.Type().Elem()))
+
+	arrParamIn := []reflect.Value{uri, header, query, body}
+
+	for _, param := range arrParamIn {
+		paramType := param.Type()
 		GetParmaTypeFunc, ok := paramType.MethodByName("GetHttpParmaType")
 		if !ok {
 			errMsg := "<In RouteRegister> GetHttpParmaType Nofound"
@@ -214,7 +229,7 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 	api := &Api{
 		Method:     strings.ToUpper(field.Tag.Get("method")),
 		ReqPath:    field.Tag.Get("route"),
-		Group:      route.GetRouteGroup(),
+		Group:      getApiGroupName(route),
 		Act:        field.Tag.Get("act"),
 		ReqTypeSet: arrReqParam,
 		RspType:    handleFunc.Type.Out(0),
@@ -231,25 +246,22 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 			reflect.ValueOf(c),
 		}
 
-		for _, reqParam := range arrReqParam {
-			reqType := reqParam.ParamType
-			if reqType == nil {
-				tLog.Error("<In RouteRegister> request paramType is nil!")
-				return
+		for _, reqParam := range arrParamIn {
+			reqType := reqParam.Type()
+
+			// 跳过为未定义类型的请求参数
+			if reqType.Elem().NumField() == 1 {
+				continue
 			}
 
 			if reqType.Kind() != reflect.Pointer {
 				reqType = reflect.PtrTo(reqType)
 			}
 
-			decodeFunc, ok := reqType.MethodByName("ReqDecode")
-			if !ok {
-				tLog.Error("<In RouteRegister> request obj error!")
-				return
-			}
+			decodeFunc := reqParam.MethodByName("ReqDecode")
 
-			arrRetValue := decodeFunc.Func.Call(
-				[]reflect.Value{reflect.New(reqType.Elem()), reflect.ValueOf(c), reflect.ValueOf(reqType)},
+			arrRetValue := decodeFunc.Call(
+				[]reflect.Value{reflect.ValueOf(c), reflect.ValueOf(reqType)},
 			)
 
 			param := arrRetValue[0].Interface()
@@ -265,9 +277,10 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 				return
 			}
 
-			handleFuncParma = append(handleFuncParma, reflect.ValueOf(param))
+			reqParam.Set(reflect.ValueOf(param))
 		}
 
+		handleFuncParma = append(handleFuncParma, request)
 		retValue := api.HandleFunc.Call(handleFuncParma)
 
 		if !c.Writer.Written() {
@@ -292,15 +305,20 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 }
 
 func getRouteGroupStack(route any) []string {
-	routeGroupName := reflect.TypeOf(route).Elem().PkgPath()
+	routeGroupName := getApiGroupName(route)
 
 	groupStack := strings.Split(routeGroupName, "/")
 
-	for k, v := range groupStack {
-		if v == "api" {
-			return groupStack[k+1:]
-		}
+	return groupStack
+}
+
+func getApiGroupName(route any) string {
+	pkgPath := reflect.TypeOf(route).Elem().PkgPath()
+	re := regexp.MustCompile(`\/api\/(.*)$`)
+	match := re.FindStringSubmatch(pkgPath)
+	if len(match) > 1 {
+		return match[1] // 输出: user/c
 	}
 
-	panic("<In getRouteGroupStack> \"api\" no found!")
+	panic("<In getApiGroupName> Error ApiGroup: " + pkgPath)
 }

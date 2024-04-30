@@ -78,8 +78,7 @@ func (s *Server) ApiRegister(api *Api) {
 		s.Api[api.ReqPath] = &ApiSet{}
 	}
 
-	sApi := s.Api[api.ReqPath].Api
-	if isSet && sApi != nil {
+	if isSet {
 		errMsg := fmt.Sprintf("The api is repeatedly defined. [%s]:%s", api.Method, api.ReqPath)
 		tLog.Error(errMsg)
 		panic(errMsg)
@@ -112,7 +111,7 @@ func (s *Server) ApiRegister(api *Api) {
 		panic(errMsg)
 	}
 
-	s.Api[api.ReqPath].Api = sApi
+	s.Api[api.ReqPath].Api = api
 }
 
 func (s *Server) ServerInit() {

@@ -8,6 +8,10 @@ import (
 	"gorm.io/gorm"
 )
 
+type IDb interface {
+	Init()
+}
+
 var Db = &DbSet{
 	Mysql: map[string]*gorm.DB{},
 }
