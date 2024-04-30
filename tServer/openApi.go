@@ -48,11 +48,11 @@ const (
 )
 
 var inType2Tag = map[string]string{
-	ParameterInFormData: "form",
-	ParameterInHeader:   "header",
-	ParameterInQuery:    "query",
-	ParameterInPath:     "uri",
-	ParameterInBody:     "json",
+	OpenApiInFormData: "form",
+	OpenApiInHeader:   "header",
+	OpenApiInQuery:    "query",
+	OpenApiInPath:     "uri",
+	OpenApiInBody:     "json",
 }
 
 type IApi interface {
@@ -160,7 +160,7 @@ func getOpts(methodApi *Api) *openApi.Operation {
 
 		// body
 		switch inType {
-		case ParameterInBody:
+		case OpenApiInBody:
 			refPath := strings.Replace(reqType.PkgPath()+"/"+reqType.Name(), "/", ".", -1)
 			reqBody.Content = map[string]openApi.MediaType{
 				"application/json": {
@@ -169,7 +169,7 @@ func getOpts(methodApi *Api) *openApi.Operation {
 					},
 				},
 			}
-		case ParameterInHeader, ParameterInQuery, ParameterInFormData, ParameterInPath:
+		case OpenApiInHeader, OpenApiInQuery, OpenApiInFormData, OpenApiInPath:
 			// Parameters
 			if reqType.Kind() == reflect.Struct {
 				for i := 0; i < reqType.NumField(); i++ {
@@ -455,15 +455,10 @@ func getSchemaRef(tp reflect.Type, args ...string) (*openApi.SchemaRef, []reflec
 }
 
 func GetInTypeByRefType(tp reflect.Type) string {
-	// 方法是指针类型的方法
-	getHttpTypeFunc, ok := reflect.PointerTo(tp).MethodByName("GetHttpParmaType")
+	instance, ok := reflect.New(tp).Interface().(IParam)
 	if !ok {
 		return ""
 	}
 
-	arrRetValue := getHttpTypeFunc.Func.Call(
-		[]reflect.Value{reflect.New(tp)},
-	)
-
-	return arrRetValue[0].String()
+	return instance.OpenApiInType()
 }

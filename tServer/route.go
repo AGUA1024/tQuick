@@ -189,32 +189,28 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 	}
 
 	for _, param := range arrParamIn {
-		paramType := param.Type()
-		GetParmaTypeFunc, ok := paramType.MethodByName("GetHttpParmaType")
+		instance, ok := param.Interface().(IParam)
 		if !ok {
-			errMsg := "<In RouteRegister> GetHttpParmaType Nofound"
+			errMsg := fmt.Sprintf("<In RouteRegister> param[%s] is Not IParam", param.Type())
 			tLog.Error(errMsg)
 			panic(errMsg)
 		}
-
-		tp := GetParmaTypeFunc.Func.Call([]reflect.Value{
-			reflect.New(paramType.Elem()),
-		})[0].String()
+		tp := instance.OpenApiInType()
 
 		reqParam := ReqParam{}
 		switch tp {
-		case ParameterInBody:
+		case OpenApiInBody:
 			reqParam.SetParmInBody()
-		case ParameterInQuery:
+		case OpenApiInQuery:
 			reqParam.SetParmInQuery()
-		case ParameterInFormData:
+		case OpenApiInFormData:
 			reqParam.SetParmInFormData()
-		case ParameterInPath:
+		case OpenApiInPath:
 			reqParam.SetParmInPath()
-		case ParameterInHeader:
+		case OpenApiInHeader:
 			reqParam.SetParmInHeader()
 		}
-		reqParam.ParamType = paramType
+		reqParam.ParamType = param.Type()
 
 		arrReqParam = append(arrReqParam, reqParam)
 	}
@@ -238,30 +234,15 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 		handleFuncParma := []reflect.Value{
 			reflect.ValueOf(ctrl),
 			reflect.ValueOf(c),
+			request,
 		}
 
 		for _, reqParam := range arrParamIn {
 			reqType := reqParam.Type()
 
-			// 跳过为未定义类型的请求参数
-			if reqType.Elem().NumField() == 1 {
-				continue
-			}
+			param, err := reqParam.Interface().(IParam).ReqDecode(c, reqType)
 
-			if reqType.Kind() != reflect.Pointer {
-				reqType = reflect.PtrTo(reqType)
-			}
-
-			decodeFunc := reqParam.MethodByName("ReqDecode")
-
-			arrRetValue := decodeFunc.Call(
-				[]reflect.Value{reflect.ValueOf(c), reflect.ValueOf(reqType)},
-			)
-
-			param := arrRetValue[0].Interface()
-			err, ok := arrRetValue[1].Interface().(error)
-
-			if ok && err != nil {
+			if err != nil {
 				c.JSON(http.StatusBadRequest,
 					gin.H{
 						"Code": http.StatusBadRequest,
@@ -274,7 +255,6 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 			reqParam.Set(reflect.ValueOf(param))
 		}
 
-		handleFuncParma = append(handleFuncParma, request)
 		retValue := api.HandleFunc.Call(handleFuncParma)
 
 		if !c.Writer.Written() {

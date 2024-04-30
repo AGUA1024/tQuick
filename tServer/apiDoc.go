@@ -66,23 +66,23 @@ func (a *ApiSet) SetMethodAny() {
 }
 
 func (r *ReqParam) SetParmInBody() {
-	r.ParmIn = ParameterInBody
+	r.ParmIn = OpenApiInBody
 }
 
 func (r *ReqParam) SetParmInQuery() {
-	r.ParmIn = ParameterInQuery
+	r.ParmIn = OpenApiInQuery
 }
 
 func (r *ReqParam) SetParmInHeader() {
-	r.ParmIn = ParameterInHeader
+	r.ParmIn = OpenApiInHeader
 }
 
 func (r *ReqParam) SetParmInFormData() {
-	r.ParmIn = ParameterInFormData
+	r.ParmIn = OpenApiInFormData
 }
 
 func (r *ReqParam) SetParmInPath() {
-	r.ParmIn = ParameterInPath
+	r.ParmIn = OpenApiInPath
 }
 
 func (a Api) GetMethod() string {
