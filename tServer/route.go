@@ -180,19 +180,13 @@ func routeHandle(s *Server, route tIRoute.IRoute, groupMiddlewares []gin.Handler
 
 	request := reflect.New(handleFunc.Type.In(2).Elem())
 
-	uri := request.Elem().FieldByName("Uri")
-	uri.Set(reflect.New(uri.Type().Elem()))
+	arrParamIn := []reflect.Value{}
+	for i := 0; i < request.Elem().NumField(); i++ {
+		param := request.Elem().Field(i)
+		param.Set(reflect.New(param.Type().Elem()))
 
-	header := request.Elem().FieldByName("Header")
-	header.Set(reflect.New(header.Type().Elem()))
-
-	query := request.Elem().FieldByName("Query")
-	query.Set(reflect.New(query.Type().Elem()))
-
-	body := request.Elem().FieldByName("Body")
-	body.Set(reflect.New(body.Type().Elem()))
-
-	arrParamIn := []reflect.Value{uri, header, query, body}
+		arrParamIn = append(arrParamIn, param)
+	}
 
 	for _, param := range arrParamIn {
 		paramType := param.Type()

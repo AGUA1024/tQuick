@@ -15,22 +15,33 @@ type {{.ApiName}} struct {
 	tServer.BaseRoute `route:"{{.ApiName}}.routePath" method:"POST" act:"{{.ApiName}}.act"`
 }
 
-type {{.ApiName}}ReqUri struct {
+type {{.ApiName}}Request struct {
+    Uri *{{.ApiName}}Uri
+    Header *{{.ApiName}}Header
+    Query *{{.ApiName}}Query
+    Body *{{.ApiName}}Body
+}
+
+type {{.ApiName}}Uri struct {
 	tServer.HttpUri
 }
 
-type {{.ApiName}}ReqHeader struct {
+type {{.ApiName}}Header struct {
 	tServer.HttpHeader
 }
 
-type {{.ApiName}}Req struct {
+type {{.ApiName}}Query struct {
 	tServer.HttpJsonBody
 }
 
-type {{.ApiName}}Rsp struct {
+type {{.ApiName}}Body struct {
+	tServer.HttpJsonBody
 }
 
-func (api *{{.ApiName}}) Handle(ctx *gin.Context, head *{{.ApiName}}ReqHeader, req *{{.ApiName}}Req, uri *{{.ApiName}}ReqUri) *{{.ApiName}}Rsp {
+type {{.ApiName}}Response struct {
+}
+
+func (api *{{.ApiName}}) Handle(ctx *gin.Context, request *{{.ApiName}}Request) *{{.ApiName}}Response {
 	panic("Not Implemented")
 	return nil
 }
