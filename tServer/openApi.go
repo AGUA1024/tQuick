@@ -412,7 +412,7 @@ func getSchemaRef(tp reflect.Type, args ...string) (*openApi.SchemaRef, []reflec
 			tagName = args[0]
 		}
 
-		propName := field.Tag.Get(tagName)
+		propName := strings.Split(field.Tag.Get(tagName), ",")[0]
 
 		if propName == "" {
 			ErrMsg := fmt.Sprintf("Api Field Tag NoFound: %s", field.Name)

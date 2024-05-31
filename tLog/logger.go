@@ -101,16 +101,6 @@ func (this *tLogger) SystemErrorLog(message ...any) {
 	//runtime.Goexit()
 }
 
-func (l *tLogger) LoadConfig() {
-	logConf := global.GetGlobalConfig().Log
-
-	l.Level = logConf.Level
-	l.MaxSize = logConf.MaxSize
-	l.MaxBackups = logConf.MaxBackups
-	l.MaxAge = logConf.MaxAge
-	l.IsCompress = logConf.IsCompress
-}
-
 func LogInit() {
 	var coreArr []zapcore.Core
 
