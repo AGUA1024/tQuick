@@ -31,7 +31,7 @@ type {{.ApiName}}Header struct {
 }
 
 type {{.ApiName}}Query struct {
-	tServer.HttpJsonBody
+	tServer.HttpQuery
 }
 
 type {{.ApiName}}Body struct {

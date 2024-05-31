@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var DEFAULT_TIME_TYPE = zapcore.TimeEncoderOfLayout(time.DateTime)
+var DEFAULT_TIME_TYPE = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 
 type ILogConf interface {
 	// 获取日志等级

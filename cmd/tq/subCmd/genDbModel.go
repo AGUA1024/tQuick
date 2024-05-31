@@ -11,8 +11,8 @@ import (
 	"text/template"
 )
 
-//go:embed createDbModel.tpl
-var createDbModelTplFS embed.FS
+//go:embed genDbModel.tpl
+var genDbModelTplFS embed.FS
 
 type Field struct {
 	Name     string
@@ -27,17 +27,17 @@ type TemplateData struct {
 }
 
 func init() {
-	CreateDbModelCmd.Flags().StringVarP(new(string), "link", "l", "", "DbLink")
-	CreateDbModelCmd.Flags().StringVarP(new(string), "table", "t", "", "TableName")
+	GenDbModelCmd.Flags().StringVarP(new(string), "link", "l", "", "DbLink")
+	GenDbModelCmd.Flags().StringVarP(new(string), "table", "t", "", "TableName")
 }
 
-var CreateDbModelCmd = &cobra.Command{
-	Use:   "create-model",
-	Aliases: []string{"cm"},
-	Short: "Get the database data model",
-	Long:  `One click generates DbModel code according to the Link of the database and the tableName`,
+var GenDbModelCmd = &cobra.Command{
+	Use:     "gen-model",
+	Aliases: []string{"g-m"},
+	Short:   "Get the database data model",
+	Long:    `One click generates DbModel code according to the Link of the database and the tableName`,
 	Run: func(cmd *cobra.Command, args []string) {
-		tpl := "createDbModel.tpl"
+		tpl := "genDbModel.tpl"
 
 		dbLink, _ := cmd.Flags().GetString("link")
 		if dbLink == "" {
@@ -56,7 +56,7 @@ var CreateDbModelCmd = &cobra.Command{
 		_, err := os.Stat("go.mod")
 		if err != nil {
 			if os.IsNotExist(err) {
-				fmt.Println("The command to create the DbModel needs to be executed in the project root directory.")
+				fmt.Println("The command to generate the DbModel needs to be executed in the project root directory.")
 			} else {
 				fmt.Println("An error occurred while checking whether the current path is the root of the project.")
 			}
@@ -92,7 +92,7 @@ var CreateDbModelCmd = &cobra.Command{
 			})
 		}
 
-		templateFile, err := createDbModelTplFS.ReadFile(tpl)
+		templateFile, err := genDbModelTplFS.ReadFile(tpl)
 		tmpl, err := template.New("DbModelTemp").Parse(string(templateFile))
 		if err != nil {
 			panic(err)
@@ -112,7 +112,7 @@ var CreateDbModelCmd = &cobra.Command{
 			panic(err)
 		}
 
-		fmt.Printf("Create DbModel Success: %s", fileName)
+		fmt.Printf("Generate DbModel Success: %s", fileName)
 	},
 }
 

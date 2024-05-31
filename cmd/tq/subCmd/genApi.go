@@ -16,23 +16,23 @@ type apiTempVar struct {
 	ApiGroupName string
 }
 
-//go:embed createApiFile.tpl
-var createApiTplFS embed.FS
+//go:embed genApiFile.tpl
+var genApiTplFS embed.FS
 
-//go:embed createApiGroupFile.tpl
-var createApiGroupTplFS embed.FS
+//go:embed genApiGroupFile.tpl
+var genApiGroupTplFS embed.FS
 
 func init() {
-	CreateApiCmd.Flags().StringVarP(new(string), "name", "n", "", "ApiName")
+	GenApiCmd.Flags().StringVarP(new(string), "name", "n", "", "ApiName")
 }
 
-var CreateApiCmd = &cobra.Command{
-	Use:     "create-api",
-	Aliases: []string{"ca"},
+var GenApiCmd = &cobra.Command{
+	Use:     "gen-api",
+	Aliases: []string{"g-a"},
 	Short:   "Generate api code",
 	Long:    `One click generates api code according to the name of the api`,
 	Run: func(cmd *cobra.Command, args []string) {
-		createApiFileTpl := "createApiFile.tpl"
+		genApiFileTpl := "genApiFile.tpl"
 
 		cmdName, _ := cmd.Flags().GetString("name")
 		if cmdName == "" {
@@ -47,7 +47,7 @@ var CreateApiCmd = &cobra.Command{
 		_, err := os.Stat("go.mod")
 		if err != nil {
 			if os.IsNotExist(err) {
-				fmt.Println("The command to create the API needs to be executed in the project root directory.")
+				fmt.Println("The command to generate the API needs to be executed in the project root directory.")
 			} else {
 				fmt.Println("An error occurred while checking whether the current path is the root of the project.")
 			}
@@ -89,7 +89,7 @@ var CreateApiCmd = &cobra.Command{
 					ApiGroupName: FirstUpper(dirName),
 				}
 
-				CreateGroupFile(groupFileName, groupFileData)
+				GenGroupFile(groupFileName, groupFileData)
 				fmt.Println("groupFileName: ", groupFileName)
 			}
 		}
@@ -105,13 +105,13 @@ var CreateApiCmd = &cobra.Command{
 
 		// 如api已经存在，则不再创建
 		if _, err := os.Stat(apiFile); !os.IsNotExist(err) {
-			fmt.Println("Create Api Failed: Api Exist!")
+			fmt.Println("Generate Api Failed: Api Exist!")
 			return
 		}
 
 		fmt.Println(apiFile, " IsExist:", os.IsExist(err))
 
-		apiTempBuf, err := createApiTplFS.ReadFile(createApiFileTpl)
+		apiTempBuf, err := genApiTplFS.ReadFile(genApiFileTpl)
 		apiTemp, err := template.New("apiTemp").Parse(string(apiTempBuf))
 		if err != nil {
 			panic(err)
@@ -127,7 +127,7 @@ var CreateApiCmd = &cobra.Command{
 			panic(err)
 		}
 
-		fmt.Printf("Create Api Success: %s", apiFile)
+		fmt.Printf("Generate Api Success: %s", apiFile)
 	},
 }
 
@@ -147,11 +147,11 @@ func FirstUpper(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-func CreateGroupFile(groupFileName string, data apiTempVar) {
-	createApiGroupTpl := "createApiGroupFile.tpl"
+func GenGroupFile(groupFileName string, data apiTempVar) {
+	genApiGroupTpl := "genApiGroupFile.tpl"
 
 	if _, err := os.Stat(groupFileName); os.IsNotExist(err) {
-		apiGroupTempBuf, err := createApiGroupTplFS.ReadFile(createApiGroupTpl)
+		apiGroupTempBuf, err := genApiGroupTplFS.ReadFile(genApiGroupTpl)
 		if err != nil {
 			panic(err)
 		}

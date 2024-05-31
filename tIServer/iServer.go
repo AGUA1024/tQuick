@@ -2,7 +2,6 @@ package tIServer
 
 import (
 	"github.com/AGUA1024/tQuick/tIRoute"
-	"github.com/gin-gonic/gin"
 )
 
 type IServer interface {
@@ -17,12 +16,4 @@ type IServer interface {
 
 	// 启动服务
 	Run()
-}
-
-type HttpReqDecoder interface {
-	// 解析请求参数
-	ReqDecode(c *gin.Context) (any, error)
-
-	// 获取请求参数类型
-	GetHttpParmaType() string
 }

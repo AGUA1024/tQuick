@@ -13,6 +13,7 @@ import (
 	_ "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"net/http"
+	"runtime"
 	"sync"
 )
 
@@ -21,6 +22,8 @@ var once sync.Once
 
 func NewServer() tIServer.IServer {
 	once.Do(func() {
+		runtime.GOMAXPROCS(runtime.NumCPU())
+
 		Serv = &Server{
 			g:   gin.Default(),
 			Api: map[string]*ApiSet{},
@@ -129,6 +132,9 @@ func (s *Server) LoadConfig() {
 
 	// 数据库初始化
 	tMiddleware.DbInit()
+
+	// 缓存数据库初始化
+	tMiddleware.CacheInit()
 
 	// 服务器初始化
 	s.ServerInit()

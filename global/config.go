@@ -8,11 +8,11 @@ import (
 var globalConfig = tQucikConf{}
 
 type tQucikConf struct {
-	Server *Server             `yaml:"server"`
-	ApiDoc *ApiDoc             `yaml:"apiDoc"`
-	Log    *Log                `yaml:"log"`
-	Db     map[string][]DbInfo `yaml:"db"`
-	Cache  *Cache              `yaml:"cache"`
+	Server *Server    `yaml:"server"`
+	ApiDoc *ApiDoc    `yaml:"apiDoc"`
+	Log    *Log       `yaml:"log"`
+	Db     *DbConf    `yaml:"db"`
+	Cache  *CacheConf `yaml:"cache"`
 }
 
 type Server struct {
@@ -34,12 +34,6 @@ type ApiFoxDoc struct {
 	Token     string `json:"token"`
 }
 
-type DbInfo struct {
-	Name    string `yaml:"name"`
-	Target  string `yaml:"target"`
-	TimeOut int    `yaml:"timeOut"`
-}
-
 type Log struct {
 	LogPath    string `yaml:"logPath"`
 	Level      string `yaml:"level"`
@@ -49,14 +43,27 @@ type Log struct {
 	IsCompress bool   `yaml:"isCompress"`
 }
 
-type Cache struct {
-	Redis []Redis `yaml:"redis"`
+type DbConf struct {
+	Log   *DbLog            `yaml:"log"`
+	Mysql []*MiddlewareInfo `yaml:"mysql"`
 }
 
-type Redis struct {
-	Name    string `yaml:"name"`
-	Target  string `yaml:"target"`
-	Timeout int    `yaml:"timeout"`
+type CacheConf struct {
+	Redis []*MiddlewareInfo `yaml:"redis"`
+}
+
+type DbLog struct {
+	Enable     bool   `yaml:"enable"`
+	Level      string `yaml:"level"`
+	MaxSize    int    `yaml:"maxSize"`
+	MaxBackups int    `yaml:"maxBackups"`
+	MaxAge     int    `yaml:"maxAge"`
+	IsCompress bool   `yaml:"isCompress"`
+}
+
+type MiddlewareInfo struct {
+	Name   string `yaml:"name"`
+	Target string `yaml:"target"`
 }
 
 func GetGlobalConfig() *tQucikConf {

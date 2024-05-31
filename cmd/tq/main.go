@@ -14,8 +14,8 @@ var serveCmd = &cobra.Command{
 }
 
 func main() {
-	serveCmd.AddCommand(subCmd.CreateApiCmd)
-	serveCmd.AddCommand(subCmd.CreateDbModelCmd)
+	serveCmd.AddCommand(subCmd.GenApiCmd)
+	serveCmd.AddCommand(subCmd.GenDbModelCmd)
 	serveCmd.AddCommand(subCmd.ProjectInitCmd)
 	serveCmd.Execute()
 }
